@@ -43,26 +43,29 @@ Every hermit instance bootstraps three repository types that work together:
 
 ## Getting Started
 
-### 1. Start Postgres
-
 ```bash
-docker compose up -d postgres
+docker compose up -d
 ```
 
-The init script `docker/init/001_init.sql` is auto-applied on first database creation.
+This starts both **PostgreSQL** and the **hermit server** (with the web frontend bundled in). The database schema is auto-applied on first run.
 
-### 2. Configure Environment
+Once ready, open `http://localhost:8080` in your browser.
 
-```bash
-cp .env.example .env
-# edit .env as needed
-```
+Default credentials:
 
-The server auto-loads `.env` from the project root at startup. Key variables:
+| | Value |
+|---|---|
+| Admin UI login | `admin` / `changeme123` |
+| Admin API token | `dev-admin-token` |
+
+### Configuration
+
+Override any setting via environment variables in `docker-compose.yml` under the `server` service, or mount a `.env` file. Key variables:
 
 | Variable | Description |
 |----------|-------------|
 | `ADMIN_TOKEN` | Admin bearer token (bootstrap + token minting) |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Initial admin account (created on first startup) |
 | `CORS_ALLOWED_ORIGINS` | Allowed browser origins, comma-separated |
 | `PROXY_UPSTREAM_URL` | Single upstream URL for proxy repo |
 | `PROXY_UPSTREAM_URLS` | Multiple upstreams (comma / newline / semicolon separated). Creates `proxy`, `proxy-2`, … and attaches all to `group` by priority |
@@ -72,26 +75,29 @@ The server auto-loads `.env` from the project root at startup. Key variables:
 | `PROXY_SYNC_DELAY` | Startup delay before first sync |
 | `PROXY_SYNC_PAGE_SIZE` | Page size for upstream crawling |
 | `PROXY_SYNC_CONCURRENCY` | Max concurrent version warmups per skill |
+| `STORAGE_BACKEND` | `local` (default) or `s3` for S3/MinIO |
 
 See [`.env.example`](.env.example) for the full list.
 
-### 3. Run Server
+### Development (without Docker)
+
+To run the server and frontend separately for local development:
 
 ```bash
+# 1. Start Postgres only
+docker compose up -d postgres
+
+# 2. Copy and edit environment config
+cp .env.example .env
+
+# 3. Run the Go server
 go run ./cmd/server
+
+# 4. Run the frontend dev server (in another terminal)
+cd web && pnpm install && pnpm dev
 ```
 
-Default listen address: `http://localhost:8080`.
-
-### 4. Run Web Frontend
-
-```bash
-cd web
-pnpm install
-pnpm dev
-```
-
-Frontend runs on `http://localhost:5173` and proxies `/api` requests to the backend.
+The frontend dev server runs on `http://localhost:5173` and proxies `/api` requests to the backend.
 
 ---
 
