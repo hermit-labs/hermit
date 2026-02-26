@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Shell -->
+  <path d="M310 160c0-66.3-53.7-120-120-120S70 93.7 70 160c0 46.4 26.4 86.6 65 106.5" fill="#E8935A"/>
+  <path d="M310 160c0-44.2-35.8-80-80-80s-80 35.8-80 80c0 30.9 17.6 57.7 43.3 71" fill="#D47A3E"/>
+  <path d="M310 160c0-22.1-17.9-40-40-40s-40 17.9-40 40c0 15.5 8.8 28.9 21.7 35.5" fill="#C06228"/>
+
+  <!-- Body -->
+  <ellipse cx="310" cy="310" rx="120" ry="90" fill="#E8935A"/>
+  <ellipse cx="310" cy="310" rx="100" ry="72" fill="#F0A870"/>
+
+  <!-- Belly segments -->
+  <path d="M230 290 Q310 280 390 290" stroke="#D47A3E" stroke-width="3" fill="none"/>
+  <path d="M225 310 Q310 300 395 310" stroke="#D47A3E" stroke-width="3" fill="none"/>
+  <path d="M228 330 Q310 320 392 330" stroke="#D47A3E" stroke-width="3" fill="none"/>
+
+  <!-- Left claw (big claw) -->
+  <path d="M200 300 Q140 260 100 280 Q60 300 80 340 Q95 370 130 360 Q155 352 170 330 Q180 318 200 310Z" fill="#E8935A" stroke="#C06228" stroke-width="3"/>
+  <path d="M100 280 Q110 310 130 300" stroke="#C06228" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <!-- Left claw pincer -->
+  <path d="M80 340 Q55 330 45 300 Q40 280 55 270" fill="#F0A870" stroke="#C06228" stroke-width="3" stroke-linecap="round"/>
+  <path d="M80 340 Q70 360 55 370 Q40 375 35 360" fill="#F0A870" stroke="#C06228" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Right claw (small claw) -->
+  <path d="M420 300 Q460 270 480 285 Q505 305 490 330 Q478 350 455 345 Q438 340 425 325 Q418 315 420 310Z" fill="#E8935A" stroke="#C06228" stroke-width="3"/>
+  <!-- Right claw pincer -->
+  <path d="M490 330 Q505 320 510 300 Q512 288 502 280" fill="#F0A870" stroke="#C06228" stroke-width="3" stroke-linecap="round"/>
+  <path d="M490 330 Q500 348 495 360 Q490 370 478 368" fill="#F0A870" stroke="#C06228" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Legs (left side) -->
+  <path d="M220 350 Q190 380 160 400 Q145 410 135 395" stroke="#D47A3E" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M210 370 Q185 395 165 420 Q155 432 142 420" stroke="#D47A3E" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M215 385 Q195 410 180 435 Q172 445 160 438" stroke="#D47A3E" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+  <!-- Legs (right side) -->
+  <path d="M400 350 Q430 380 450 400 Q460 410 470 395" stroke="#D47A3E" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M410 370 Q435 395 450 420 Q458 432 468 420" stroke="#D47A3E" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M405 385 Q420 410 435 435 Q442 445 452 438" stroke="#D47A3E" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+  <!-- Eye stalks -->
+  <path d="M280 240 Q270 200 260 180" stroke="#E8935A" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <path d="M340 240 Q350 200 360 180" stroke="#E8935A" stroke-width="8" fill="none" stroke-linecap="round"/>
+
+  <!-- Eyes -->
+  <circle cx="258" cy="175" r="14" fill="#2D2D2D"/>
+  <circle cx="362" cy="175" r="14" fill="#2D2D2D"/>
+  <circle cx="254" cy="171" r="5" fill="white"/>
+  <circle cx="358" cy="171" r="5" fill="white"/>
+
+  <!-- Antennae -->
+  <path d="M275 235 Q250 190 230 160 Q220 145 210 150" stroke="#D47A3E" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M345 235 Q370 190 390 160 Q400 145 410 150" stroke="#D47A3E" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+  <!-- Mouth -->
+  <path d="M298 270 Q310 280 322 270" stroke="#C06228" stroke-width="3" fill="none" stroke-linecap="round"/>
+</svg>
