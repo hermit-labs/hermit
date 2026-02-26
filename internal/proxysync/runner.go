@@ -69,19 +69,20 @@ func (r *Runner) Run(ctx context.Context, pageSize int) (Summary, error) {
 			joined = errors.Join(joined, fmt.Errorf("%s: %w", repo.Name, err))
 		}
 
-		r.logger.Printf("[sync] [%d/%d] repo %q done: skills=%d versions=%d cached=%d failed=%d",
-			i+1, len(repos), repo.Name, stats.Skills, stats.Versions, stats.Cached, stats.Failed)
+		r.logger.Printf("[sync] [%d/%d] repo %q done: skills=%d versions=%d cached=%d failed=%d skipped=%d",
+			i+1, len(repos), repo.Name, stats.Skills, stats.Versions, stats.Cached, stats.Failed, stats.Skipped)
 
 		summary.Repositories++
 		summary.Skills += stats.Skills
 		summary.Versions += stats.Versions
 		summary.Cached += stats.Cached
 		summary.Failed += stats.Failed
+		summary.Skipped += stats.Skipped
 		summary.ByRepository = append(summary.ByRepository, stats)
 	}
 
-	r.logger.Printf("[sync] sync run complete: repos=%d skills=%d versions=%d cached=%d failed=%d",
-		summary.Repositories, summary.Skills, summary.Versions, summary.Cached, summary.Failed)
+	r.logger.Printf("[sync] sync run complete: repos=%d skills=%d versions=%d cached=%d failed=%d skipped=%d",
+		summary.Repositories, summary.Skills, summary.Versions, summary.Cached, summary.Failed, summary.Skipped)
 
 	return summary, joined
 }

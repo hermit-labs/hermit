@@ -33,6 +33,11 @@ func (s *Service) ListProxyRepositories(ctx context.Context) ([]store.Repository
 	return proxies, nil
 }
 
+func (s *Service) HasProxyVersion(ctx context.Context, repo store.Repository, slug, version string) bool {
+	_, err := s.store.GetArtifact(ctx, repo.ID, slug, version)
+	return err == nil
+}
+
 func (s *Service) SyncProxyVersion(ctx context.Context, repo store.Repository, slug, version string) error {
 	if err := s.syncProxyVersion(ctx, repo, slug, version); err != nil {
 		return err

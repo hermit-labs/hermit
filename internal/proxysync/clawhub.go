@@ -128,6 +128,8 @@ func (s *clawHubSyncer) Sync(ctx context.Context, pageSize int) (RepoStats, erro
 		}
 		s.logger.Printf("[sync] [%s] skills page %d returned %d items", s.repo.Name, pageNum, len(page.Items))
 
+		versionChecker, hasVersionChecker := s.cache.(VersionChecker)
+
 		for _, item := range page.Items {
 			if err := ctx.Err(); err != nil {
 				s.logger.Printf("[sync] [%s] context cancelled, aborting", s.repo.Name)
@@ -148,6 +150,26 @@ func (s *clawHubSyncer) Sync(ctx context.Context, pageSize int) (RepoStats, erro
 					changelog:       trimOptionalString(item.LatestVersion.Changelog, true),
 					changelogSource: trimOptionalString(item.LatestVersion.ChangelogSource, false),
 				}
+			}
+
+			if hasVersionChecker && latest.version != "" && versionChecker.HasProxyVersion(ctx, s.repo, slug, latest.version) {
+				s.logger.Printf("[sync] [%s] skill %q: latest version %q already cached, skipping", s.repo.Name, slug, latest.version)
+				stats.Skipped++
+
+				if metaCacher, ok := s.cache.(ProxySkillMetaCacher); ok {
+					if err := metaCacher.SyncProxySkillMeta(
+						ctx,
+						s.repo,
+						slug,
+						strings.TrimSpace(item.DisplayName),
+						normalizeSummary(item.Summary),
+						normalizeTagPatch(item.Tags),
+					); err != nil {
+						s.logger.Printf("[sync] [%s] skill %q: failed to sync skill metadata: %v", s.repo.Name, slug, err)
+						stats.Failed++
+					}
+				}
+				continue
 			}
 
 			versions, err := s.fetchAllVersions(ctx, slug, pageSize)
@@ -193,8 +215,8 @@ func (s *clawHubSyncer) Sync(ctx context.Context, pageSize int) (RepoStats, erro
 		cursor = strings.TrimSpace(*page.NextCursor)
 	}
 
-	s.logger.Printf("[sync] [%s] sync complete: skills=%d versions=%d cached=%d failed=%d",
-		s.repo.Name, stats.Skills, stats.Versions, stats.Cached, stats.Failed)
+	s.logger.Printf("[sync] [%s] sync complete: skills=%d versions=%d cached=%d failed=%d skipped=%d",
+		s.repo.Name, stats.Skills, stats.Versions, stats.Cached, stats.Failed, stats.Skipped)
 	return stats, nil
 }
 

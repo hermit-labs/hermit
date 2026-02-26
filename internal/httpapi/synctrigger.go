@@ -59,8 +59,8 @@ func (st *SyncTrigger) TriggerSync(_ context.Context) (bool, error) {
 		} else {
 			st.lastError = nil
 			st.logger.Printf(
-				"manual sync finished: repos=%d skills=%d versions=%d cached=%d failed=%d",
-				summary.Repositories, summary.Skills, summary.Versions, summary.Cached, summary.Failed,
+				"manual sync finished: repos=%d skills=%d versions=%d cached=%d failed=%d skipped=%d",
+				summary.Repositories, summary.Skills, summary.Versions, summary.Cached, summary.Failed, summary.Skipped,
 			)
 		}
 		st.mu.Unlock()

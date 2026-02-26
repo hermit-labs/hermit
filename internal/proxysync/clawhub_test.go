@@ -760,6 +760,175 @@ func TestClawHubSyncer_SyncVersionsConcurrently(t *testing.T) {
 	}
 }
 
+type incrementalRecordCacher struct {
+	metaRecordCacher
+	existing map[string]bool
+}
+
+func (c *incrementalRecordCacher) HasProxyVersion(_ context.Context, _ store.Repository, slug, version string) bool {
+	return c.existing[slug+"@"+version]
+}
+
+func TestClawHubSyncer_SkipsSkillWhenLatestVersionCached(t *testing.T) {
+	t.Parallel()
+
+	var versionsFetched atomic.Int64
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/skills", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{
+					"slug":          "cached-skill",
+					"displayName":   "Cached Skill",
+					"summary":       "already synced",
+					"latestVersion": map[string]any{"version": "2.0.0"},
+				},
+				{
+					"slug":          "new-skill",
+					"displayName":   "New Skill",
+					"latestVersion": map[string]any{"version": "1.0.0"},
+				},
+			},
+			"nextCursor": nil,
+		})
+	})
+	mux.HandleFunc("/api/v1/skills/cached-skill/versions", func(w http.ResponseWriter, _ *http.Request) {
+		versionsFetched.Add(1)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"items":      []map[string]any{{"version": "2.0.0"}, {"version": "1.0.0"}},
+			"nextCursor": nil,
+		})
+	})
+	mux.HandleFunc("/api/v1/skills/new-skill/versions", func(w http.ResponseWriter, _ *http.Request) {
+		versionsFetched.Add(1)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"items":      []map[string]any{{"version": "1.0.0"}},
+			"nextCursor": nil,
+		})
+	})
+
+	s := httptest.NewServer(mux)
+	defer s.Close()
+	upstream := s.URL
+	repo := store.Repository{
+		Name:        "proxy",
+		Type:        store.RepoTypeProxy,
+		UpstreamURL: &upstream,
+		Enabled:     true,
+	}
+
+	cacher := &incrementalRecordCacher{
+		existing: map[string]bool{
+			"cached-skill@2.0.0": true,
+		},
+	}
+	factory := NewAbstractFactory(
+		FactoryDeps{
+			HTTPClient:    s.Client(),
+			VersionCacher: cacher,
+		},
+		NewClawHubBuilder(),
+	)
+	syncer, err := factory.NewRepoSyncer(repo)
+	if err != nil {
+		t.Fatalf("NewRepoSyncer() error = %v", err)
+	}
+
+	stats, err := syncer.Sync(context.Background(), 20)
+	if err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+
+	if stats.Skills != 2 {
+		t.Fatalf("stats.Skills = %d, want 2", stats.Skills)
+	}
+	if stats.Skipped != 1 {
+		t.Fatalf("stats.Skipped = %d, want 1", stats.Skipped)
+	}
+	if stats.Cached != 1 {
+		t.Fatalf("stats.Cached = %d, want 1", stats.Cached)
+	}
+	if stats.Versions != 1 {
+		t.Fatalf("stats.Versions = %d, want 1", stats.Versions)
+	}
+
+	if versionsFetched.Load() != 1 {
+		t.Fatalf("versions endpoint fetched %d times, want 1 (cached-skill should be skipped)", versionsFetched.Load())
+	}
+
+	gotCalls := sortedStrings(cacher.Calls())
+	wantCalls := []string{"new-skill@1.0.0"}
+	if !reflect.DeepEqual(gotCalls, wantCalls) {
+		t.Fatalf("SyncProxyVersion calls = %#v, want %#v", gotCalls, wantCalls)
+	}
+
+	metaCalls := cacher.MetaCalls()
+	if len(metaCalls) != 2 {
+		t.Fatalf("meta calls len = %d, want 2 (metadata should sync for both skills)", len(metaCalls))
+	}
+	slugs := []string{metaCalls[0].slug, metaCalls[1].slug}
+	sort.Strings(slugs)
+	wantSlugs := []string{"cached-skill", "new-skill"}
+	if !reflect.DeepEqual(slugs, wantSlugs) {
+		t.Fatalf("meta call slugs = %v, want %v", slugs, wantSlugs)
+	}
+}
+
+func TestClawHubSyncer_NoSkipWhenVersionCheckerNotImplemented(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/skills", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{"slug": "alpha", "latestVersion": map[string]any{"version": "1.0.0"}},
+			},
+			"nextCursor": nil,
+		})
+	})
+	mux.HandleFunc("/api/v1/skills/alpha/versions", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"items":      []map[string]any{{"version": "1.0.0"}},
+			"nextCursor": nil,
+		})
+	})
+
+	s := httptest.NewServer(mux)
+	defer s.Close()
+	upstream := s.URL
+	repo := store.Repository{
+		Name:        "proxy",
+		Type:        store.RepoTypeProxy,
+		UpstreamURL: &upstream,
+		Enabled:     true,
+	}
+
+	cacher := &recordCacher{}
+	factory := NewAbstractFactory(
+		FactoryDeps{
+			HTTPClient:    s.Client(),
+			VersionCacher: cacher,
+		},
+		NewClawHubBuilder(),
+	)
+	syncer, err := factory.NewRepoSyncer(repo)
+	if err != nil {
+		t.Fatalf("NewRepoSyncer() error = %v", err)
+	}
+
+	stats, err := syncer.Sync(context.Background(), 20)
+	if err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+
+	if stats.Skipped != 0 {
+		t.Fatalf("stats.Skipped = %d, want 0 (no VersionChecker)", stats.Skipped)
+	}
+	if stats.Cached != 1 {
+		t.Fatalf("stats.Cached = %d, want 1", stats.Cached)
+	}
+}
+
 func sortedStrings(in []string) []string {
 	out := append([]string(nil), in...)
 	sort.Strings(out)

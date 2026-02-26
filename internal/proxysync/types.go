@@ -13,6 +13,7 @@ type RepoStats struct {
 	Versions   int
 	Cached     int
 	Failed     int
+	Skipped    int
 }
 
 type Summary struct {
@@ -21,6 +22,7 @@ type Summary struct {
 	Versions     int
 	Cached       int
 	Failed       int
+	Skipped      int
 	ByRepository []RepoStats
 }
 
@@ -38,6 +40,10 @@ type ProxySkillMetaCacher interface {
 
 type ProxyVersionMetaCacher interface {
 	SyncProxyVersionMeta(context.Context, store.Repository, string, string, *time.Time, *string, *string) error
+}
+
+type VersionChecker interface {
+	HasProxyVersion(ctx context.Context, repo store.Repository, slug, version string) bool
 }
 
 type RepoSyncer interface {
