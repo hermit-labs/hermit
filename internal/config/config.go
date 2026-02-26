@@ -36,9 +36,6 @@ type Config struct {
 	BootstrapDefaults    bool
 	ProxyTimeout         time.Duration
 	ProxyNegativeTTL     time.Duration
-	ProxySyncEnabled     bool
-	ProxySyncInterval    time.Duration
-	ProxySyncDelay       time.Duration
 	ProxySyncPageSize    int
 	ProxySyncConcurrency int
 	MaxUploadBytes       int64
@@ -77,9 +74,6 @@ func Load() (Config, error) {
 		BootstrapDefaults:    getenvBool("BOOTSTRAP_DEFAULT_REPOS", true),
 		ProxyTimeout:         getenvDuration("PROXY_TIMEOUT", 30*time.Second),
 		ProxyNegativeTTL:     getenvDuration("PROXY_NEGATIVE_TTL", 5*time.Minute),
-		ProxySyncEnabled:     getenvBool("PROXY_SYNC_ENABLED", false),
-		ProxySyncInterval:    getenvDuration("PROXY_SYNC_INTERVAL", 30*time.Minute),
-		ProxySyncDelay:       getenvDuration("PROXY_SYNC_DELAY", 10*time.Second),
 		ProxySyncPageSize:    getenvInt("PROXY_SYNC_PAGE_SIZE", 100),
 		ProxySyncConcurrency: getenvInt("PROXY_SYNC_CONCURRENCY", 4),
 		MaxUploadBytes:       getenvInt64("MAX_UPLOAD_BYTES", 128*1024*1024),
@@ -123,13 +117,6 @@ func Load() (Config, error) {
 	if cfg.ProxySyncConcurrency <= 0 {
 		cfg.ProxySyncConcurrency = 1
 	}
-	if cfg.ProxySyncInterval < 0 {
-		cfg.ProxySyncInterval = 0
-	}
-	if cfg.ProxySyncDelay < 0 {
-		cfg.ProxySyncDelay = 0
-	}
-
 	// LDAP
 	cfg.LDAPEnabled = getenvBool("LDAP_ENABLED", false)
 	cfg.LDAPURL = getenv("LDAP_URL", "")

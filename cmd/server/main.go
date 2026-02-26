@@ -75,7 +75,6 @@ func main() {
 		seedProxySyncConfig(ctx, svc, cfg)
 	}
 
-	// Proxy sync: always create runner/trigger, worker reads enabled flag from DB.
 	factory := proxysync.NewAbstractFactory(
 		proxysync.FactoryDeps{
 			HTTPClient:      &http.Client{Timeout: cfg.ProxyTimeout},
@@ -85,21 +84,6 @@ func main() {
 		proxysync.NewClawHubBuilder(),
 	)
 	runner := proxysync.NewRunner(svc, factory)
-	configProvider := &syncConfigAdapter{svc: svc}
-
-	worker := proxysync.NewWorker(
-		runner,
-		proxysync.WorkerConfig{
-			Enabled:      true,
-			StartupDelay: cfg.ProxySyncDelay,
-			Interval:     cfg.ProxySyncInterval,
-			PageSize:     cfg.ProxySyncPageSize,
-		},
-		configProvider,
-		log.Default(),
-	)
-	go worker.Run(ctx)
-
 	syncTrigger := httpapi.NewSyncTrigger(runner, svc, cfg.ProxySyncPageSize, log.Default())
 
 	authn := auth.NewAuthenticator(pool, cfg.AdminToken)
@@ -131,24 +115,6 @@ func main() {
 	}
 }
 
-// syncConfigAdapter bridges service.Service to proxysync.ConfigProvider.
-type syncConfigAdapter struct {
-	svc *service.Service
-}
-
-func (a *syncConfigAdapter) GetWorkerConfig(ctx context.Context) (proxysync.WorkerConfig, error) {
-	cfg, err := a.svc.GetProxySyncConfig(ctx)
-	if err != nil {
-		return proxysync.WorkerConfig{}, err
-	}
-	return proxysync.WorkerConfig{
-		Enabled:      cfg.Enabled,
-		StartupDelay: cfg.Delay(),
-		Interval:     cfg.Interval(),
-		PageSize:     cfg.PageSizeOrDefault(),
-	}, nil
-}
-
 func seedAuthConfigs(ctx context.Context, svc *service.Service, cfg config.Config) {
 	if cfg.LDAPEnabled {
 		ldapCfg := extauth.LDAPConfig{
@@ -175,16 +141,13 @@ func seedAuthConfigs(ctx context.Context, svc *service.Service, cfg config.Confi
 
 func seedProxySyncConfig(ctx context.Context, svc *service.Service, cfg config.Config) {
 	psc := service.ProxySyncConfig{
-		Enabled:     cfg.ProxySyncEnabled,
-		IntervalStr: fmt.Sprintf("%s", cfg.ProxySyncInterval),
-		DelayStr:    fmt.Sprintf("%s", cfg.ProxySyncDelay),
 		PageSize:    cfg.ProxySyncPageSize,
 		Concurrency: cfg.ProxySyncConcurrency,
 	}
 	if err := svc.SeedProxySyncConfig(ctx, psc); err != nil {
 		log.Printf("warning: seed proxy sync config: %v", err)
 	} else {
-		log.Printf("proxy sync config seeded from env vars (enabled=%v)", cfg.ProxySyncEnabled)
+		log.Printf("proxy sync config seeded from env vars")
 	}
 }
 

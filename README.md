@@ -70,10 +70,7 @@ Override any setting via environment variables in `docker-compose.yml` under the
 | `PROXY_UPSTREAM_URL` | Single upstream URL for proxy repo |
 | `PROXY_UPSTREAM_URLS` | Multiple upstreams (comma / newline / semicolon separated). Creates `proxy`, `proxy-2`, … and attaches all to `group` by priority |
 | `DEFAULT_HOSTED_REPO` / `DEFAULT_PROXY_REPO` / `DEFAULT_GROUP_REPO` | Default repository names |
-| `PROXY_SYNC_ENABLED` | Enable background upstream catalog sync |
-| `PROXY_SYNC_INTERVAL` | Sync interval (default `30m`) |
-| `PROXY_SYNC_DELAY` | Startup delay before first sync |
-| `PROXY_SYNC_PAGE_SIZE` | Page size for upstream crawling |
+| `PROXY_SYNC_PAGE_SIZE` | Page size for manual sync crawling |
 | `PROXY_SYNC_CONCURRENCY` | Max concurrent version warmups per skill |
 | `STORAGE_BACKEND` | `local` (default) or `s3` for S3/MinIO |
 
@@ -268,5 +265,5 @@ curl -s \
 - **Immutable versions** — publishing the same `slug + version` returns `409 Conflict`.
 - **Proxy lazy cache** — upstream skills are fetched on first request and cached locally; a negative cache prevents repeated misses.
 - **Group as single entrance** — Hosted and Proxy are internal; the public API always reads through the Group repository.
-- **Background sync** — when `PROXY_SYNC_ENABLED=true`, a worker proactively crawls the upstream catalog into the proxy cache instead of waiting for the first download hit.
+- **Manual sync** — admins can trigger a one-off upstream catalog sync via the "Sync Now" button; page size and concurrency are configurable in the Admin UI.
 - **Client-side version diff** — the Compare tab fetches file content for two versions and computes unified diffs in the browser using the `diff` library, requiring no server-side diff endpoint.

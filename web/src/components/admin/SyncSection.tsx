@@ -296,9 +296,9 @@ function SyncStatusCard({
         <div className="card-body py-3 flex-row items-center gap-3">
           <AlertCircle className="h-5 w-5 text-warning shrink-0" />
           <div>
-            <p className="font-medium text-sm">Proxy sync is not configured</p>
+            <p className="font-medium text-sm">Sync is not configured</p>
             <p className="text-xs text-base-content/60">
-              Set <code className="bg-base-300 px-1 rounded">PROXY_SYNC_ENABLED=true</code> to enable background sync
+              Add a sync source and use &ldquo;Sync Now&rdquo; to start
             </p>
           </div>
         </div>
@@ -353,9 +353,6 @@ function SyncConfigCard({
   })
 
   const [form, setForm] = useState<ProxySyncConfig>({
-    enabled: false,
-    interval: '30m',
-    delay: '10s',
     page_size: 100,
     concurrency: 4,
   })
@@ -369,7 +366,7 @@ function SyncConfigCard({
   const saveMutation = useMutation({
     mutationFn: () => api.saveProxySyncConfig(form),
     onSuccess: () => {
-      onSuccess('Sync configuration saved (takes effect next cycle)')
+      onSuccess('Sync configuration saved')
       queryClient.invalidateQueries({ queryKey: ['proxy-sync-config'] })
     },
     onError: (err: APIError) => onError(err.message),
@@ -401,43 +398,7 @@ function SyncConfigCard({
               saveMutation.mutate()
             }}
           >
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                className="toggle toggle-sm toggle-primary"
-                checked={form.enabled}
-                onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
-              />
-              <span className="text-sm font-medium">
-                {form.enabled ? 'Background sync enabled' : 'Background sync disabled'}
-              </span>
-            </label>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="form-control">
-                <label className="label py-0.5">
-                  <span className="label-text text-xs">Interval</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="30m"
-                  className="input input-bordered input-sm"
-                  value={form.interval}
-                  onChange={(e) => setForm({ ...form, interval: e.target.value })}
-                />
-              </div>
-              <div className="form-control">
-                <label className="label py-0.5">
-                  <span className="label-text text-xs">Startup Delay</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="10s"
-                  className="input input-bordered input-sm"
-                  value={form.delay}
-                  onChange={(e) => setForm({ ...form, delay: e.target.value })}
-                />
-              </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="form-control">
                 <label className="label py-0.5">
                   <span className="label-text text-xs">Page Size</span>

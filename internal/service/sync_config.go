@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -13,24 +12,8 @@ const configKeyProxySync = "proxy_sync"
 
 // ProxySyncConfig is the database-backed proxy sync configuration.
 type ProxySyncConfig struct {
-	Enabled     bool   `json:"enabled"`
-	IntervalStr string `json:"interval"`
-	DelayStr    string `json:"delay"`
-	PageSize    int    `json:"page_size"`
-	Concurrency int    `json:"concurrency"`
-}
-
-func (c ProxySyncConfig) Interval() time.Duration {
-	d, _ := time.ParseDuration(c.IntervalStr)
-	if d <= 0 {
-		return 30 * time.Minute
-	}
-	return d
-}
-
-func (c ProxySyncConfig) Delay() time.Duration {
-	d, _ := time.ParseDuration(c.DelayStr)
-	return d
+	PageSize    int `json:"page_size"`
+	Concurrency int `json:"concurrency"`
 }
 
 func (c ProxySyncConfig) PageSizeOrDefault() int {
@@ -52,9 +35,6 @@ func (s *Service) GetProxySyncConfig(ctx context.Context) (ProxySyncConfig, erro
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ProxySyncConfig{
-				Enabled:     false,
-				IntervalStr: "30m",
-				DelayStr:    "10s",
 				PageSize:    100,
 				Concurrency: 4,
 			}, nil
@@ -69,12 +49,6 @@ func (s *Service) GetProxySyncConfig(ctx context.Context) (ProxySyncConfig, erro
 }
 
 func (s *Service) SaveProxySyncConfig(ctx context.Context, cfg ProxySyncConfig) error {
-	if _, err := time.ParseDuration(cfg.IntervalStr); cfg.IntervalStr != "" && err != nil {
-		return fmt.Errorf("%w: invalid interval %q", ErrInvalidInput, cfg.IntervalStr)
-	}
-	if _, err := time.ParseDuration(cfg.DelayStr); cfg.DelayStr != "" && err != nil {
-		return fmt.Errorf("%w: invalid delay %q", ErrInvalidInput, cfg.DelayStr)
-	}
 	raw, err := json.Marshal(cfg)
 	if err != nil {
 		return err

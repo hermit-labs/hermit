@@ -47,9 +47,6 @@ func TestParseUpstreamURLs(t *testing.T) {
 }
 
 func TestLoadProxySyncConfig(t *testing.T) {
-	t.Setenv("PROXY_SYNC_ENABLED", "true")
-	t.Setenv("PROXY_SYNC_INTERVAL", "2m")
-	t.Setenv("PROXY_SYNC_DELAY", "3s")
 	t.Setenv("PROXY_SYNC_PAGE_SIZE", "123")
 	t.Setenv("PROXY_SYNC_CONCURRENCY", "7")
 	t.Setenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173;http://example.com")
@@ -59,15 +56,6 @@ func TestLoadProxySyncConfig(t *testing.T) {
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
-	}
-	if !cfg.ProxySyncEnabled {
-		t.Fatalf("ProxySyncEnabled = false, want true")
-	}
-	if cfg.ProxySyncInterval.String() != "2m0s" {
-		t.Fatalf("ProxySyncInterval = %s, want 2m0s", cfg.ProxySyncInterval)
-	}
-	if cfg.ProxySyncDelay.String() != "3s" {
-		t.Fatalf("ProxySyncDelay = %s, want 3s", cfg.ProxySyncDelay)
 	}
 	if cfg.ProxySyncPageSize != 123 {
 		t.Fatalf("ProxySyncPageSize = %d, want 123", cfg.ProxySyncPageSize)

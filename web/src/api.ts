@@ -162,9 +162,6 @@ export interface SyncResult {
 }
 
 export interface ProxySyncConfig {
-  enabled: boolean
-  interval: string
-  delay: string
   page_size: number
   concurrency: number
 }
