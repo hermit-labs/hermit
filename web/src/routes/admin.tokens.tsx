@@ -148,22 +148,18 @@ function TokenManagementPage() {
                 }}
                 className="space-y-3"
               >
-                <div className="form-control">
-                  <label className="label py-1">
-                    <span className="label-text text-xs font-medium uppercase tracking-wide text-base-content/50">
-                      Token name
-                    </span>
-                  </label>
+                <fieldset className="fieldset">
+                  <legend className="fieldset-legend text-xs">Token name</legend>
                   <input
                     type="text"
                     placeholder="e.g. CI/CD, CLI, my-laptop"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="input input-bordered input-sm"
+                    className="input input-bordered input-sm w-full"
                     disabled={createMutation.isPending}
                     required
                   />
-                </div>
+                </fieldset>
                 <button
                   type="submit"
                   className="btn btn-primary btn-sm w-full"
@@ -202,6 +198,7 @@ function TokenManagementPage() {
               </div>
             </div>
           </div>
+
         </div>
 
         {/* Right column — Token list */}
@@ -288,3 +285,4 @@ function TokenManagementPage() {
     </div>
   )
 }
+

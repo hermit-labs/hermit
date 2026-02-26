@@ -291,6 +291,28 @@ func (s *Service) ResetUserPassword(ctx context.Context, userID, newPassword str
 	return nil
 }
 
+// ChangePassword verifies the caller's current password, then sets a new one.
+func (s *Service) ChangePassword(ctx context.Context, username, oldPassword, newPassword string) error {
+	if len(newPassword) < 6 {
+		return fmt.Errorf("%w: password must be at least 6 characters", ErrInvalidInput)
+	}
+	u, err := s.store.GetUserByUsername(ctx, strings.TrimSpace(username))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(oldPassword)); err != nil {
+		return fmt.Errorf("%w: current password is incorrect", ErrInvalidInput)
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+	return s.store.UpdateUserPassword(ctx, u.ID, string(hash))
+}
+
 // DeleteUser removes a local user account (admin only).
 func (s *Service) DeleteUser(ctx context.Context, userID string) error {
 	id, err := uuid.Parse(userID)

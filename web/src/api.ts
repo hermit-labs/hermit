@@ -225,6 +225,12 @@ export const api = {
 
   whoami: () => request<{ user: User }>(`${API_BASE}/whoami`),
 
+  changePassword: (oldPassword: string, newPassword: string) =>
+    request<{ ok: boolean }>(`${API_BASE}/account/change-password`, {
+      method: 'POST',
+      body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+    }),
+
   publishSkill: async (
     payload: {
       slug: string

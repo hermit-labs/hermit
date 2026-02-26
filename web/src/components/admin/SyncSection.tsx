@@ -153,29 +153,37 @@ export function SyncSection() {
                 e.preventDefault()
                 addMutation.mutate({ name: newName.trim(), upstreamUrl: newUrl.trim() })
               }}
-              className="flex flex-col sm:flex-row gap-3"
+              className="space-y-3"
             >
-              <input
-                type="text"
-                placeholder="Name (e.g. proxy-2)"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="input input-bordered flex-1"
-                required
-              />
-              <input
-                type="url"
-                placeholder="Upstream URL (e.g. https://clawhub.ai)"
-                value={newUrl}
-                onChange={(e) => setNewUrl(e.target.value)}
-                className="input input-bordered flex-2"
-                required
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-3">
+                <fieldset className="fieldset">
+                  <legend className="fieldset-legend text-xs">Name</legend>
+                  <input
+                    type="text"
+                    placeholder="e.g. proxy-2"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="input input-bordered w-full"
+                    required
+                  />
+                </fieldset>
+                <fieldset className="fieldset">
+                  <legend className="fieldset-legend text-xs">Upstream URL</legend>
+                  <input
+                    type="url"
+                    placeholder="e.g. https://clawhub.ai"
+                    value={newUrl}
+                    onChange={(e) => setNewUrl(e.target.value)}
+                    className="input input-bordered w-full"
+                    required
+                  />
+                </fieldset>
+              </div>
               <div className="flex gap-2">
-                <button type="submit" className="btn btn-primary" disabled={addMutation.isPending}>
+                <button type="submit" className="btn btn-primary btn-sm" disabled={addMutation.isPending}>
                   {addMutation.isPending ? 'Adding…' : 'Add'}
                 </button>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowAddForm(false)}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowAddForm(false)}>
                   Cancel
                 </button>
               </div>
@@ -399,30 +407,26 @@ function SyncConfigCard({
             }}
           >
             <div className="grid grid-cols-2 gap-3">
-              <div className="form-control">
-                <label className="label py-0.5">
-                  <span className="label-text text-xs">Page Size</span>
-                </label>
+              <fieldset className="fieldset">
+                <legend className="fieldset-legend text-xs">Page Size</legend>
                 <input
                   type="number"
                   min={1}
-                  className="input input-bordered input-sm"
+                  className="input input-bordered input-sm w-full"
                   value={form.page_size}
                   onChange={(e) => setForm({ ...form, page_size: parseInt(e.target.value) || 100 })}
                 />
-              </div>
-              <div className="form-control">
-                <label className="label py-0.5">
-                  <span className="label-text text-xs">Concurrency</span>
-                </label>
+              </fieldset>
+              <fieldset className="fieldset">
+                <legend className="fieldset-legend text-xs">Concurrency</legend>
                 <input
                   type="number"
                   min={1}
-                  className="input input-bordered input-sm"
+                  className="input input-bordered input-sm w-full"
                   value={form.concurrency}
                   onChange={(e) => setForm({ ...form, concurrency: parseInt(e.target.value) || 4 })}
                 />
-              </div>
+              </fieldset>
             </div>
 
             <button

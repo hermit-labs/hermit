@@ -195,13 +195,11 @@ function ProviderCard({
           }}
         >
           {fields.map((f) => (
-            <div key={f.key} className="form-control">
-              <label className="label py-0.5">
-                <span className="label-text text-xs">
-                  {f.label}
-                  {f.required && <span className="text-error"> *</span>}
-                </span>
-              </label>
+            <fieldset key={f.key} className="fieldset">
+              <legend className="fieldset-legend text-xs">
+                {f.label}
+                {f.required && <span className="text-error"> *</span>}
+              </legend>
               <input
                 type={f.sensitive ? 'password' : 'text'}
                 placeholder={f.placeholder}
@@ -209,7 +207,7 @@ function ProviderCard({
                 value={formData[f.key] ?? ''}
                 onChange={(e) => setFormData({ ...formData, [f.key]: e.target.value })}
               />
-            </div>
+            </fieldset>
           ))}
 
           {extraBoolFields?.map((f) => (

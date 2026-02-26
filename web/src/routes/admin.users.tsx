@@ -216,29 +216,21 @@ function CreateUserForm({
           }}
           className="grid grid-cols-1 sm:grid-cols-2 gap-4"
         >
-          <div className="form-control">
-            <label className="label py-1">
-              <span className="label-text text-xs font-medium uppercase tracking-wide text-base-content/50">
-                Username *
-              </span>
-            </label>
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend text-xs">Username *</legend>
             <input
               type="text"
               placeholder="e.g. alice"
-              className="input input-bordered input-sm"
+              className="input input-bordered input-sm w-full"
               value={form.username}
               onChange={(e) =>
                 setForm({ ...form, username: e.target.value })
               }
               required
             />
-          </div>
-          <div className="form-control">
-            <label className="label py-1">
-              <span className="label-text text-xs font-medium uppercase tracking-wide text-base-content/50">
-                Password *
-              </span>
-            </label>
+          </fieldset>
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend text-xs">Password *</legend>
             <div className="join w-full">
               <input
                 type={showPw ? 'text' : 'password'}
@@ -263,41 +255,33 @@ function CreateUserForm({
                 )}
               </button>
             </div>
-          </div>
-          <div className="form-control">
-            <label className="label py-1">
-              <span className="label-text text-xs font-medium uppercase tracking-wide text-base-content/50">
-                Display Name
-              </span>
-            </label>
+          </fieldset>
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend text-xs">Display Name</legend>
             <input
               type="text"
               placeholder="e.g. Alice Smith"
-              className="input input-bordered input-sm"
+              className="input input-bordered input-sm w-full"
               value={form.display_name}
               onChange={(e) =>
                 setForm({ ...form, display_name: e.target.value })
               }
             />
-          </div>
-          <div className="form-control">
-            <label className="label py-1">
-              <span className="label-text text-xs font-medium uppercase tracking-wide text-base-content/50">
-                Email
-              </span>
-            </label>
+          </fieldset>
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend text-xs">Email</legend>
             <input
               type="email"
               placeholder="e.g. alice@company.com"
-              className="input input-bordered input-sm"
+              className="input input-bordered input-sm w-full"
               value={form.email}
               onChange={(e) =>
                 setForm({ ...form, email: e.target.value })
               }
             />
-          </div>
-          <div className="form-control sm:col-span-2">
-            <label className="label cursor-pointer justify-start gap-3">
+          </fieldset>
+          <div className="sm:col-span-2">
+            <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
                 className="toggle toggle-sm toggle-primary"
@@ -307,9 +291,7 @@ function CreateUserForm({
                 }
               />
               <div>
-                <span className="label-text font-medium">
-                  Administrator
-                </span>
+                <span className="text-sm font-medium">Administrator</span>
                 <p className="text-xs text-base-content/50">
                   Full access to all admin features
                 </p>
@@ -376,20 +358,18 @@ function UserRow({
 
   return (
     <div
-      className={`rounded-lg border transition-colors ${
-        user.disabled
-          ? 'bg-base-100/50 border-base-300 opacity-60'
-          : 'bg-base-100 border-base-300 hover:border-base-content/20'
-      }`}
+      className={`rounded-lg border transition-colors ${user.disabled
+        ? 'bg-base-100/50 border-base-300 opacity-60'
+        : 'bg-base-100 border-base-300 hover:border-base-content/20'
+        }`}
     >
       {/* Main row */}
       <div className="flex items-center gap-3 p-3">
         <div
-          className={`rounded-lg p-2 ${
-            user.is_admin
-              ? 'bg-error/10 text-error'
-              : 'bg-primary/10 text-primary'
-          }`}
+          className={`rounded-lg p-2 ${user.is_admin
+            ? 'bg-error/10 text-error'
+            : 'bg-primary/10 text-primary'
+            }`}
         >
           {user.is_admin ? (
             <Shield className="h-4 w-4" />
@@ -524,34 +504,30 @@ function EditUserPanel({
         }}
         className="grid grid-cols-1 sm:grid-cols-2 gap-3"
       >
-        <div className="form-control">
-          <label className="label py-0.5">
-            <span className="label-text text-xs">Display Name</span>
-          </label>
+        <fieldset className="fieldset">
+          <legend className="fieldset-legend text-xs">Display Name</legend>
           <input
             type="text"
-            className="input input-bordered input-sm"
+            className="input input-bordered input-sm w-full"
             value={form.display_name}
             onChange={(e) =>
               setForm({ ...form, display_name: e.target.value })
             }
           />
-        </div>
-        <div className="form-control">
-          <label className="label py-0.5">
-            <span className="label-text text-xs">Email</span>
-          </label>
+        </fieldset>
+        <fieldset className="fieldset">
+          <legend className="fieldset-legend text-xs">Email</legend>
           <input
             type="email"
-            className="input input-bordered input-sm"
+            className="input input-bordered input-sm w-full"
             value={form.email}
             onChange={(e) =>
               setForm({ ...form, email: e.target.value })
             }
           />
-        </div>
+        </fieldset>
         <div className="flex gap-6 sm:col-span-2">
-          <label className="label cursor-pointer gap-2">
+          <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               className="toggle toggle-sm toggle-primary"
@@ -560,12 +536,12 @@ function EditUserPanel({
                 setForm({ ...form, is_admin: e.target.checked })
               }
             />
-            <span className="label-text text-sm flex items-center gap-1">
+            <span className="text-sm flex items-center gap-1">
               <Shield className="h-3.5 w-3.5" />
               Admin
             </span>
           </label>
-          <label className="label cursor-pointer gap-2">
+          <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               className="toggle toggle-sm toggle-warning"
@@ -574,7 +550,7 @@ function EditUserPanel({
                 setForm({ ...form, disabled: e.target.checked })
               }
             />
-            <span className="label-text text-sm flex items-center gap-1">
+            <span className="text-sm flex items-center gap-1">
               {form.disabled ? (
                 <Ban className="h-3.5 w-3.5" />
               ) : (
@@ -642,13 +618,10 @@ function ResetPasswordPanel({
         }}
         className="flex items-end gap-3"
       >
-        <div className="form-control flex-1">
-          <label className="label py-0.5">
-            <span className="label-text text-xs">
-              New password for{' '}
-              <strong>{user.username}</strong>
-            </span>
-          </label>
+        <fieldset className="fieldset flex-1">
+          <legend className="fieldset-legend text-xs">
+            New password for <strong>{user.username}</strong>
+          </legend>
           <div className="join w-full">
             <input
               type={showPw ? 'text' : 'password'}
@@ -670,27 +643,28 @@ function ResetPasswordPanel({
                 <Eye className="h-3.5 w-3.5" />
               )}
             </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={onCancel}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              disabled={mutation.isPending || password.length < 6}
+            >
+              {mutation.isPending ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <KeyRound className="h-3.5 w-3.5" />
+              )}
+              Reset
+            </button>
           </div>
-        </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-xs"
-          onClick={onCancel}
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          className="btn btn-warning btn-xs"
-          disabled={mutation.isPending || password.length < 6}
-        >
-          {mutation.isPending ? (
-            <span className="loading loading-spinner loading-xs" />
-          ) : (
-            <KeyRound className="h-3 w-3" />
-          )}
-          Reset
-        </button>
+        </fieldset>
+
       </form>
     </div>
   )

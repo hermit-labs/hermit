@@ -27,6 +27,24 @@ func (h *Handler) Whoami(c echo.Context) error {
 	})
 }
 
+func (h *Handler) ChangePassword(c echo.Context) error {
+	claims, ok := auth.GetClaims(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	var req struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+	}
+	if err := h.svc.ChangePassword(c.Request().Context(), claims.Subject, req.OldPassword, req.NewPassword); err != nil {
+		return mapServiceError(err)
+	}
+	return c.JSON(http.StatusOK, map[string]any{"ok": true})
+}
+
 func (h *Handler) PublishSkill(c echo.Context) error {
 	claims, ok := auth.GetClaims(c)
 	if !ok {

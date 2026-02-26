@@ -57,6 +57,9 @@ func (a *API) registerAuthV1Routes(v1 *echo.Group) {
 	v1Auth.DELETE("/skills/:slug", a.handler.DeleteSkill)
 	v1Auth.POST("/skills/:slug/undelete", a.handler.UndeleteSkill)
 
+	// Self-service account management
+	v1Auth.POST("/account/change-password", a.handler.ChangePassword)
+
 	// Personal Access Tokens (user self-service)
 	v1Auth.GET("/tokens", a.handler.ListMyTokens)
 	v1Auth.POST("/tokens", a.handler.CreateMyToken)

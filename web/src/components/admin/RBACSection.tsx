@@ -143,26 +143,28 @@ export function RBACSection() {
                 e.preventDefault()
                 assignMutation.mutate({ repoId: assignRepoId, subject: assignSubject.trim(), role: assignRole })
               }}
-              className="flex flex-col sm:flex-row gap-3 items-end"
+              className="space-y-3"
             >
-              <div className="form-control flex-1">
-                <label className="label py-1"><span className="label-text text-xs">Repository</span></label>
-                <select className="select select-bordered select-sm" value={assignRepoId} onChange={(e) => setAssignRepoId(e.target.value)} required>
-                  <option value="">Select repository...</option>
-                  {repos.filter((r) => r.type !== 'group').map((r) => (
-                    <option key={r.id} value={r.id}>{r.name} ({r.type})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-control flex-1">
-                <label className="label py-1"><span className="label-text text-xs">Subject (username or *)</span></label>
-                <input type="text" placeholder="e.g. alice, team-a, *" value={assignSubject} onChange={(e) => setAssignSubject(e.target.value)} className="input input-bordered input-sm" required />
-              </div>
-              <div className="form-control">
-                <label className="label py-1"><span className="label-text text-xs">Role</span></label>
-                <select className="select select-bordered select-sm" value={assignRole} onChange={(e) => setAssignRole(e.target.value)}>
-                  {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <fieldset className="fieldset">
+                  <legend className="fieldset-legend text-xs">Repository</legend>
+                  <select className="select select-bordered select-sm w-full" value={assignRepoId} onChange={(e) => setAssignRepoId(e.target.value)} required>
+                    <option value="">Select repository...</option>
+                    {repos.filter((r) => r.type !== 'group').map((r) => (
+                      <option key={r.id} value={r.id}>{r.name} ({r.type})</option>
+                    ))}
+                  </select>
+                </fieldset>
+                <fieldset className="fieldset">
+                  <legend className="fieldset-legend text-xs">Subject (username or *)</legend>
+                  <input type="text" placeholder="e.g. alice, team-a, *" value={assignSubject} onChange={(e) => setAssignSubject(e.target.value)} className="input input-bordered input-sm w-full" required />
+                </fieldset>
+                <fieldset className="fieldset">
+                  <legend className="fieldset-legend text-xs">Role</legend>
+                  <select className="select select-bordered select-sm w-full" value={assignRole} onChange={(e) => setAssignRole(e.target.value)}>
+                    {ROLE_OPTIONS.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
+                  </select>
+                </fieldset>
               </div>
               <div className="flex gap-2">
                 <button type="submit" className="btn btn-primary btn-sm" disabled={assignMutation.isPending}>

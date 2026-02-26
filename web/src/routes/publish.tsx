@@ -118,53 +118,71 @@ function PublishPage() {
         <div className="card-body">
           <h2 className="card-title">Metadata</h2>
           <div className="grid grid-cols-2 gap-3">
-            <input
-              type="text"
-              placeholder="Slug"
-              value={form.slug}
-              onChange={(e) => setForm({ ...form, slug: e.target.value })}
-              className="input input-bordered"
-              required
-            />
-            <input
-              type="text"
-              placeholder="Display name"
-              value={form.displayName}
-              onChange={(e) =>
-                setForm({ ...form, displayName: e.target.value })
-              }
-              className="input input-bordered"
-              required
-            />
-            <input
-              type="text"
-              placeholder="Version"
-              value={form.version}
-              onChange={(e) => setForm({ ...form, version: e.target.value })}
-              className="input input-bordered"
-              required
-            />
-            <input
-              type="text"
-              placeholder="Tags (comma-separated)"
-              value={form.tags}
-              onChange={(e) => setForm({ ...form, tags: e.target.value })}
-              className="input input-bordered"
-            />
+            <fieldset className="fieldset">
+              <legend className="fieldset-legend text-xs">Slug *</legend>
+              <input
+                type="text"
+                placeholder="e.g. my-skill"
+                value={form.slug}
+                onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                className="input input-bordered w-full"
+                required
+              />
+            </fieldset>
+            <fieldset className="fieldset">
+              <legend className="fieldset-legend text-xs">Display Name *</legend>
+              <input
+                type="text"
+                placeholder="e.g. My Skill"
+                value={form.displayName}
+                onChange={(e) =>
+                  setForm({ ...form, displayName: e.target.value })
+                }
+                className="input input-bordered w-full"
+                required
+              />
+            </fieldset>
+            <fieldset className="fieldset">
+              <legend className="fieldset-legend text-xs">Version *</legend>
+              <input
+                type="text"
+                placeholder="e.g. 1.0.0"
+                value={form.version}
+                onChange={(e) => setForm({ ...form, version: e.target.value })}
+                className="input input-bordered w-full"
+                required
+              />
+            </fieldset>
+            <fieldset className="fieldset">
+              <legend className="fieldset-legend text-xs">Tags</legend>
+              <input
+                type="text"
+                placeholder="comma-separated"
+                value={form.tags}
+                onChange={(e) => setForm({ ...form, tags: e.target.value })}
+                className="input input-bordered w-full"
+              />
+            </fieldset>
           </div>
-          <textarea
-            placeholder="Summary"
-            value={form.summary}
-            onChange={(e) => setForm({ ...form, summary: e.target.value })}
-            className="textarea textarea-bordered"
-          />
-          <textarea
-            placeholder="Changelog"
-            value={form.changelog}
-            onChange={(e) => setForm({ ...form, changelog: e.target.value })}
-            className="textarea textarea-bordered"
-            required
-          />
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend text-xs">Summary</legend>
+            <textarea
+              placeholder="Brief description of the skill"
+              value={form.summary}
+              onChange={(e) => setForm({ ...form, summary: e.target.value })}
+              className="textarea textarea-bordered w-full"
+            />
+          </fieldset>
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend text-xs">Changelog *</legend>
+            <textarea
+              placeholder="What changed in this version"
+              value={form.changelog}
+              onChange={(e) => setForm({ ...form, changelog: e.target.value })}
+              className="textarea textarea-bordered w-full"
+              required
+            />
+          </fieldset>
         </div>
       </div>
 
