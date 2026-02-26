@@ -14,16 +14,23 @@ import (
 )
 
 type API struct {
-	cfg     config.Config
-	auth    *auth.Authenticator
-	handler *handlers.Handler
+	cfg         config.Config
+	auth        *auth.Authenticator
+	handler     *handlers.Handler
+	syncTrigger *SyncTrigger
 }
 
-func New(cfg config.Config, svc *service.Service, authn *auth.Authenticator) *API {
+func New(
+	cfg config.Config,
+	svc *service.Service,
+	authn *auth.Authenticator,
+	syncTrigger *SyncTrigger,
+) *API {
 	return &API{
-		cfg:     cfg,
-		auth:    authn,
-		handler: handlers.New(cfg, svc, authn),
+		cfg:         cfg,
+		auth:        authn,
+		handler:     handlers.New(cfg, svc, authn, syncTrigger),
+		syncTrigger: syncTrigger,
 	}
 }
 

@@ -31,6 +31,23 @@ type Config struct {
 	HTTPReadTimeout      time.Duration
 	HTTPWriteTimeout     time.Duration
 	HTTPIdleTimeout      time.Duration
+
+	// LDAP authentication
+	LDAPEnabled      bool
+	LDAPURL          string
+	LDAPBaseDN       string
+	LDAPBindDN       string
+	LDAPBindPassword string
+	LDAPUserFilter   string
+	LDAPUserAttr     string
+	LDAPDisplayAttr  string
+	LDAPStartTLS     bool
+	LDAPSkipVerify   bool
+	LDAPAdminGroups  []string
+
+	// Initial admin user (created on bootstrap)
+	AdminUsername string
+	AdminPassword string
 }
 
 func Load() (Config, error) {
@@ -86,6 +103,23 @@ func Load() (Config, error) {
 	if cfg.ProxySyncDelay < 0 {
 		cfg.ProxySyncDelay = 0
 	}
+
+	// LDAP
+	cfg.LDAPEnabled = getenvBool("LDAP_ENABLED", false)
+	cfg.LDAPURL = getenv("LDAP_URL", "")
+	cfg.LDAPBaseDN = getenv("LDAP_BASE_DN", "")
+	cfg.LDAPBindDN = getenv("LDAP_BIND_DN", "")
+	cfg.LDAPBindPassword = getenv("LDAP_BIND_PASSWORD", "")
+	cfg.LDAPUserFilter = getenv("LDAP_USER_FILTER", "(uid={{.Username}})")
+	cfg.LDAPUserAttr = getenv("LDAP_USER_ATTR", "uid")
+	cfg.LDAPDisplayAttr = getenv("LDAP_DISPLAY_ATTR", "cn")
+	cfg.LDAPStartTLS = getenvBool("LDAP_STARTTLS", false)
+	cfg.LDAPSkipVerify = getenvBool("LDAP_SKIP_VERIFY", false)
+	cfg.LDAPAdminGroups = parseList(getenv("LDAP_ADMIN_GROUPS", ""))
+
+	// Initial admin user
+	cfg.AdminUsername = getenv("ADMIN_USERNAME", "admin")
+	cfg.AdminPassword = getenv("ADMIN_PASSWORD", "")
 
 	return cfg, nil
 }

@@ -10,12 +10,18 @@ import (
 	"strings"
 	"time"
 
+	"hermit/internal/auth"
 	"hermit/internal/store"
 
 	"github.com/google/uuid"
 )
 
-func (s *Service) SearchSkills(ctx context.Context, repo store.Repository, query string, limit int) ([]store.SkillSearchResult, error) {
+// getGroupMembers resolves group members filtered by the actor's permissions.
+func (s *Service) getGroupMembers(ctx context.Context, groupRepoID uuid.UUID, actor auth.Actor) ([]store.Repository, error) {
+	return s.store.ListAccessibleGroupMembers(ctx, groupRepoID, actor.Subject, actor.IsAdmin || actor.Anonymous)
+}
+
+func (s *Service) SearchSkills(ctx context.Context, repo store.Repository, actor auth.Actor, query string, limit int) ([]store.SkillSearchResult, error) {
 	if limit <= 0 {
 		limit = 20
 	}
@@ -23,7 +29,7 @@ func (s *Service) SearchSkills(ctx context.Context, repo store.Repository, query
 		return s.store.SearchSkills(ctx, repo.ID, query, limit)
 	}
 
-	members, err := s.store.ListGroupMembers(ctx, repo.ID)
+	members, err := s.getGroupMembers(ctx, repo.ID, actor)
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +77,7 @@ func (s *Service) SearchSkills(ctx context.Context, repo store.Repository, query
 func (s *Service) ListSkills(
 	ctx context.Context,
 	repo store.Repository,
+	actor auth.Actor,
 	limit int,
 	offset int,
 	sortBy string,
@@ -85,7 +92,7 @@ func (s *Service) ListSkills(
 		return s.store.ListSkills(ctx, repo.ID, limit, offset, sortBy)
 	}
 
-	members, err := s.store.ListGroupMembers(ctx, repo.ID)
+	members, err := s.getGroupMembers(ctx, repo.ID, actor)
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +127,8 @@ func (s *Service) ListSkills(
 	return out[offset:end], nil
 }
 
-func (s *Service) GetSkill(ctx context.Context, repo store.Repository, slug string) (SkillView, error) {
-	targetRepo, err := s.findSkillRepository(ctx, repo, slug)
+func (s *Service) GetSkill(ctx context.Context, repo store.Repository, actor auth.Actor, slug string) (SkillView, error) {
+	targetRepo, err := s.findSkillRepository(ctx, repo, actor, slug)
 	if err != nil {
 		return SkillView{}, err
 	}
@@ -155,11 +162,12 @@ func (s *Service) GetSkill(ctx context.Context, repo store.Repository, slug stri
 func (s *Service) ListSkillVersions(
 	ctx context.Context,
 	repo store.Repository,
+	actor auth.Actor,
 	slug string,
 	limit int,
 	offset int,
 ) ([]store.SkillVersion, error) {
-	targetRepo, err := s.findSkillRepository(ctx, repo, slug)
+	targetRepo, err := s.findSkillRepository(ctx, repo, actor, slug)
 	if err != nil {
 		return nil, err
 	}
@@ -169,10 +177,11 @@ func (s *Service) ListSkillVersions(
 func (s *Service) GetSkillVersion(
 	ctx context.Context,
 	repo store.Repository,
+	actor auth.Actor,
 	slug string,
 	version string,
 ) (SkillVersionView, error) {
-	targetRepo, err := s.findSkillRepository(ctx, repo, slug)
+	targetRepo, err := s.findSkillRepository(ctx, repo, actor, slug)
 	if err != nil {
 		return SkillVersionView{}, err
 	}
@@ -189,10 +198,11 @@ func (s *Service) GetSkillVersion(
 func (s *Service) ResolveSkillVersion(
 	ctx context.Context,
 	repo store.Repository,
+	actor auth.Actor,
 	slug string,
 	hash string,
 ) (ResolveView, error) {
-	targetRepo, err := s.findSkillRepository(ctx, repo, slug)
+	targetRepo, err := s.findSkillRepository(ctx, repo, actor, slug)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return ResolveView{}, nil
@@ -237,6 +247,7 @@ func (s *Service) ResolveSkillVersion(
 func (s *Service) ReadSkillFile(
 	ctx context.Context,
 	repo store.Repository,
+	actor auth.Actor,
 	slug string,
 	version string,
 	tag string,
@@ -247,7 +258,7 @@ func (s *Service) ReadSkillFile(
 		return nil, fmt.Errorf("%w: path required", ErrInvalidInput)
 	}
 
-	artifact, err := s.DownloadArtifact(ctx, repo, slug, version, tag, false)
+	artifact, err := s.DownloadArtifact(ctx, repo, actor, slug, version, tag, false)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +305,7 @@ func (s *Service) DeleteSkill(ctx context.Context, repo store.Repository, slug s
 	return nil
 }
 
-func (s *Service) findSkillRepository(ctx context.Context, repo store.Repository, slug string) (store.Repository, error) {
+func (s *Service) findSkillRepository(ctx context.Context, repo store.Repository, actor auth.Actor, slug string) (store.Repository, error) {
 	if repo.Type != store.RepoTypeGroup {
 		if _, err := s.store.GetSkill(ctx, repo.ID, slug); err != nil {
 			if store.IsNotFound(err) {
@@ -304,7 +315,7 @@ func (s *Service) findSkillRepository(ctx context.Context, repo store.Repository
 		}
 		return repo, nil
 	}
-	members, err := s.store.ListGroupMembers(ctx, repo.ID)
+	members, err := s.getGroupMembers(ctx, repo.ID, actor)
 	if err != nil {
 		return store.Repository{}, err
 	}
@@ -319,6 +330,7 @@ func (s *Service) findSkillRepository(ctx context.Context, repo store.Repository
 func (s *Service) resolveInRepo(
 	ctx context.Context,
 	repo store.Repository,
+	actor auth.Actor,
 	slug string,
 	version string,
 	visited map[uuid.UUID]struct{},
@@ -338,12 +350,12 @@ func (s *Service) resolveInRepo(
 		}
 		visited[repo.ID] = struct{}{}
 
-		members, err := s.store.ListGroupMembers(ctx, repo.ID)
+		members, err := s.getGroupMembers(ctx, repo.ID, actor)
 		if err != nil {
 			return store.Artifact{}, err
 		}
 		for _, member := range members {
-			artifact, err := s.resolveInRepo(ctx, member, slug, version, visited)
+			artifact, err := s.resolveInRepo(ctx, member, actor, slug, version, visited)
 			if err == nil {
 				return artifact, nil
 			}
@@ -361,6 +373,7 @@ func (s *Service) resolveInRepo(
 func (s *Service) resolveLatestArtifactInRepo(
 	ctx context.Context,
 	repo store.Repository,
+	actor auth.Actor,
 	slug string,
 	visited map[uuid.UUID]struct{},
 ) (store.Artifact, error) {
@@ -383,12 +396,12 @@ func (s *Service) resolveLatestArtifactInRepo(
 		}
 		visited[repo.ID] = struct{}{}
 
-		members, err := s.store.ListGroupMembers(ctx, repo.ID)
+		members, err := s.getGroupMembers(ctx, repo.ID, actor)
 		if err != nil {
 			return store.Artifact{}, err
 		}
 		for _, member := range members {
-			a, err := s.resolveLatestArtifactInRepo(ctx, member, slug, visited)
+			a, err := s.resolveLatestArtifactInRepo(ctx, member, actor, slug, visited)
 			if err == nil {
 				return a, nil
 			}
@@ -406,6 +419,7 @@ func (s *Service) resolveLatestArtifactInRepo(
 func (s *Service) resolveTagVersionInRepo(
 	ctx context.Context,
 	repo store.Repository,
+	actor auth.Actor,
 	slug string,
 	tag string,
 	visited map[uuid.UUID]struct{},
@@ -423,12 +437,12 @@ func (s *Service) resolveTagVersionInRepo(
 		}
 		visited[repo.ID] = struct{}{}
 
-		members, err := s.store.ListGroupMembers(ctx, repo.ID)
+		members, err := s.getGroupMembers(ctx, repo.ID, actor)
 		if err != nil {
 			return nil, err
 		}
 		for _, member := range members {
-			ver, err := s.resolveTagVersionInRepo(ctx, member, slug, tag, visited)
+			ver, err := s.resolveTagVersionInRepo(ctx, member, actor, slug, tag, visited)
 			if err != nil {
 				return nil, err
 			}

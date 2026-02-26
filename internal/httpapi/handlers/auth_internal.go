@@ -155,7 +155,8 @@ func (h *Handler) setDelete(c echo.Context, deleted bool) error {
 	return c.JSON(http.StatusOK, map[string]any{"ok": true})
 }
 
-func (h *Handler) CreateToken(c echo.Context) error {
+// AdminCreateToken allows admins to create a token for any subject.
+func (h *Handler) AdminCreateToken(c echo.Context) error {
 	claims, ok := auth.GetClaims(c)
 	if !ok {
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
@@ -166,16 +167,74 @@ func (h *Handler) CreateToken(c echo.Context) error {
 
 	var req struct {
 		Subject string `json:"subject"`
+		Name    string `json:"name"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
 	}
-	token, err := h.svc.CreateToken(c.Request().Context(), req.Subject)
+	if req.Name == "" {
+		req.Name = "admin-created"
+	}
+	rawToken, tok, err := h.svc.CreatePersonalToken(c.Request().Context(), req.Subject, req.Name, false)
 	if err != nil {
 		return mapServiceError(err)
 	}
 	return c.JSON(http.StatusOK, map[string]any{
 		"subject": req.Subject,
-		"token":   token,
+		"token":   rawToken,
+		"id":      tok.ID.String(),
+		"name":    tok.Name,
 	})
+}
+
+// ListMyTokens returns the current user's personal access tokens.
+func (h *Handler) ListMyTokens(c echo.Context) error {
+	claims, ok := auth.GetClaims(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	tokens, err := h.svc.ListMyTokens(c.Request().Context(), claims.Subject)
+	if err != nil {
+		return mapServiceError(err)
+	}
+	if tokens == nil {
+		tokens = []store.APIToken{}
+	}
+	return c.JSON(http.StatusOK, map[string]any{"tokens": tokens})
+}
+
+// CreateMyToken creates a personal access token for the current user.
+func (h *Handler) CreateMyToken(c echo.Context) error {
+	claims, ok := auth.GetClaims(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+	}
+	rawToken, tok, err := h.svc.CreatePersonalToken(c.Request().Context(), claims.Subject, req.Name, claims.IsAdmin)
+	if err != nil {
+		return mapServiceError(err)
+	}
+	return c.JSON(http.StatusOK, map[string]any{
+		"token": rawToken,
+		"id":    tok.ID.String(),
+		"name":  tok.Name,
+	})
+}
+
+// RevokeMyToken deletes a personal access token for the current user.
+func (h *Handler) RevokeMyToken(c echo.Context) error {
+	claims, ok := auth.GetClaims(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	tokenID := c.Param("tokenId")
+	if err := h.svc.RevokeToken(c.Request().Context(), tokenID, claims.Subject, claims.IsAdmin); err != nil {
+		return mapServiceError(err)
+	}
+	return c.JSON(http.StatusOK, map[string]any{"ok": true})
 }

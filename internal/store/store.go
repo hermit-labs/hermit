@@ -216,6 +216,130 @@ func (s *Store) ListGroupMembers(ctx context.Context, groupRepoID uuid.UUID) ([]
 	return repos, nil
 }
 
+// ListAccessibleGroupMembers returns group member repos that the given subject
+// can access. A member is accessible if:
+//   - the subject has any role on it, OR
+//   - the wildcard subject '*' has a role on it (public repo).
+//
+// If allAccess is true, all members are returned (admin shortcut).
+func (s *Store) ListAccessibleGroupMembers(ctx context.Context, groupRepoID uuid.UUID, subject string, allAccess bool) ([]Repository, error) {
+	if allAccess || subject == "" {
+		return s.ListGroupMembers(ctx, groupRepoID)
+	}
+
+	rows, err := s.db.Query(ctx, `
+		SELECT DISTINCT r.id, r.name, r.type::text, r.upstream_url, r.enabled, gm.priority
+		FROM group_members gm
+		JOIN repositories r ON r.id = gm.member_repo_id
+		WHERE gm.group_repo_id = $1
+		  AND (
+			EXISTS (SELECT 1 FROM repo_members rm WHERE rm.repo_id = r.id AND rm.subject = $2)
+			OR EXISTS (SELECT 1 FROM repo_members rm WHERE rm.repo_id = r.id AND rm.subject = '*')
+		  )
+		ORDER BY gm.priority ASC, r.name ASC
+	`, groupRepoID, subject)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var repos []Repository
+	for rows.Next() {
+		var repo Repository
+		var priority int
+		if err := rows.Scan(&repo.ID, &repo.Name, &repo.Type, &repo.UpstreamURL, &repo.Enabled, &priority); err != nil {
+			return nil, err
+		}
+		repos = append(repos, repo)
+	}
+	return repos, rows.Err()
+}
+
+type RepoMember struct {
+	RepoID    uuid.UUID
+	RepoName  string
+	Subject   string
+	Role      string
+	CreatedAt time.Time
+}
+
+func (s *Store) ListRepoMembers(ctx context.Context, repoID uuid.UUID) ([]RepoMember, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT rm.repo_id, r.name, rm.subject, rm.role::text, rm.created_at
+		FROM repo_members rm
+		JOIN repositories r ON r.id = rm.repo_id
+		WHERE rm.repo_id = $1
+		ORDER BY rm.subject
+	`, repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []RepoMember
+	for rows.Next() {
+		var m RepoMember
+		if err := rows.Scan(&m.RepoID, &m.RepoName, &m.Subject, &m.Role, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		members = append(members, m)
+	}
+	return members, rows.Err()
+}
+
+func (s *Store) ListAllRepoMembers(ctx context.Context) ([]RepoMember, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT rm.repo_id, r.name, rm.subject, rm.role::text, rm.created_at
+		FROM repo_members rm
+		JOIN repositories r ON r.id = rm.repo_id
+		ORDER BY r.name, rm.subject
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []RepoMember
+	for rows.Next() {
+		var m RepoMember
+		if err := rows.Scan(&m.RepoID, &m.RepoName, &m.Subject, &m.Role, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		members = append(members, m)
+	}
+	return members, rows.Err()
+}
+
+func (s *Store) RemoveRepoMember(ctx context.Context, repoID uuid.UUID, subject string) error {
+	ct, err := s.db.Exec(ctx, `
+		DELETE FROM repo_members
+		WHERE repo_id = $1 AND subject = $2
+	`, repoID, subject)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+// HasAnyRepoAccess checks if the subject has any role on the given repo,
+// either directly or via the '*' wildcard.
+func (s *Store) HasAnyRepoAccess(ctx context.Context, repoID uuid.UUID, subject string) (bool, error) {
+	var n int
+	err := s.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM repo_members
+		WHERE repo_id = $1
+		  AND subject IN ($2, '*')
+	`, repoID, subject).Scan(&n)
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
 func (s *Store) EnsurePackageTx(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -843,32 +967,114 @@ func (s *Store) SetSkillDeleted(ctx context.Context, repoID uuid.UUID, slug stri
 	return nil
 }
 
-func (s *Store) CreateToken(ctx context.Context, subject, tokenHash string) error {
-	_, err := s.db.Exec(ctx, `
-		INSERT INTO api_tokens (token_hash, subject)
-		VALUES ($1, $2)
-	`, tokenHash, subject)
-	if err != nil {
-		if isUniqueViolation(err) {
-			return ErrConflict
-		}
-		return err
-	}
-	return nil
+// APIToken represents a row in the api_tokens table.
+type APIToken struct {
+	ID         uuid.UUID  `json:"id"`
+	Subject    string     `json:"subject"`
+	Name       string     `json:"name"`
+	TokenType  string     `json:"token_type"`
+	IsAdmin    bool       `json:"is_admin"`
+	Disabled   bool       `json:"disabled"`
+	CreatedAt  time.Time  `json:"created_at"`
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 }
 
-func (s *Store) GetTokenSubjectByHash(ctx context.Context, tokenHash string) (string, bool, error) {
-	var subject string
-	var disabled bool
+const (
+	TokenTypeSession  = "session"
+	TokenTypePersonal = "personal"
+)
+
+// CreatePersonalToken inserts a new personal access token.
+func (s *Store) CreatePersonalToken(ctx context.Context, subject, name, tokenHash string, isAdmin bool) (uuid.UUID, error) {
+	var id uuid.UUID
 	err := s.db.QueryRow(ctx, `
-		SELECT subject, disabled
+		INSERT INTO api_tokens (token_hash, subject, name, token_type, is_admin)
+		VALUES ($1, $2, $3, 'personal', $4)
+		RETURNING id
+	`, tokenHash, subject, name, isAdmin).Scan(&id)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return uuid.Nil, ErrConflict
+		}
+		return uuid.Nil, err
+	}
+	return id, nil
+}
+
+// UpsertSessionToken creates or replaces the session token for a subject.
+// Each subject has at most one active session token.
+func (s *Store) UpsertSessionToken(ctx context.Context, subject, tokenHash string, isAdmin bool) error {
+	_, err := s.db.Exec(ctx, `
+		DELETE FROM api_tokens WHERE subject = $1 AND token_type = 'session'
+	`, subject)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(ctx, `
+		INSERT INTO api_tokens (token_hash, subject, name, token_type, is_admin)
+		VALUES ($1, $2, '', 'session', $3)
+	`, tokenHash, subject, isAdmin)
+	return err
+}
+
+// AuthenticateToken looks up a token by hash and returns its metadata.
+func (s *Store) AuthenticateToken(ctx context.Context, tokenHash string) (APIToken, error) {
+	var t APIToken
+	err := s.db.QueryRow(ctx, `
+		SELECT id, subject, name, token_type, is_admin, disabled, created_at, last_used_at
 		FROM api_tokens
 		WHERE token_hash = $1
-	`, tokenHash).Scan(&subject, &disabled)
+	`, tokenHash).Scan(&t.ID, &t.Subject, &t.Name, &t.TokenType, &t.IsAdmin, &t.Disabled, &t.CreatedAt, &t.LastUsedAt)
 	if err != nil {
-		return "", false, err
+		return APIToken{}, err
 	}
-	return subject, disabled, nil
+	return t, nil
+}
+
+// TouchTokenLastUsed updates the last_used_at timestamp.
+func (s *Store) TouchTokenLastUsed(ctx context.Context, id uuid.UUID) {
+	_, _ = s.db.Exec(ctx, `UPDATE api_tokens SET last_used_at = now() WHERE id = $1`, id)
+}
+
+// ListTokensBySubject returns all personal tokens for a given subject.
+func (s *Store) ListTokensBySubject(ctx context.Context, subject string) ([]APIToken, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, subject, name, token_type, is_admin, disabled, created_at, last_used_at
+		FROM api_tokens
+		WHERE subject = $1 AND token_type = 'personal'
+		ORDER BY created_at DESC
+	`, subject)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var tokens []APIToken
+	for rows.Next() {
+		var t APIToken
+		if err := rows.Scan(&t.ID, &t.Subject, &t.Name, &t.TokenType, &t.IsAdmin, &t.Disabled, &t.CreatedAt, &t.LastUsedAt); err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, t)
+	}
+	return tokens, rows.Err()
+}
+
+// RevokeToken deletes a token by id, scoped to a subject (unless allAccess).
+func (s *Store) RevokeToken(ctx context.Context, tokenID uuid.UUID, subject string, allAccess bool) error {
+	var ct pgconn.CommandTag
+	var err error
+	if allAccess {
+		ct, err = s.db.Exec(ctx, `DELETE FROM api_tokens WHERE id = $1`, tokenID)
+	} else {
+		ct, err = s.db.Exec(ctx, `DELETE FROM api_tokens WHERE id = $1 AND subject = $2`, tokenID, subject)
+	}
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
 }
 
 func skillSortClause(sort string) string {
@@ -900,6 +1106,126 @@ func IsNotFound(err error) bool {
 	return errors.Is(err, pgx.ErrNoRows)
 }
 
+func (s *Store) ListRepositories(ctx context.Context) ([]Repository, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, name, type::text, upstream_url, enabled
+		FROM repositories
+		ORDER BY type, name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var repos []Repository
+	for rows.Next() {
+		var repo Repository
+		if err := rows.Scan(&repo.ID, &repo.Name, &repo.Type, &repo.UpstreamURL, &repo.Enabled); err != nil {
+			return nil, err
+		}
+		repos = append(repos, repo)
+	}
+	return repos, rows.Err()
+}
+
+type DashboardStats struct {
+	TotalSkills   int64
+	TotalVersions int64
+	TotalDownloads int64
+	TotalStars    int64
+	TotalInstalls int64
+}
+
+func (s *Store) GetDashboardStats(ctx context.Context, repoIDs []uuid.UUID) (DashboardStats, error) {
+	var stats DashboardStats
+	err := s.db.QueryRow(ctx, `
+		SELECT
+			COUNT(*),
+			COALESCE(SUM(downloads), 0),
+			COALESCE(SUM(stars), 0),
+			COALESCE(SUM(installs_all_time), 0)
+		FROM packages
+		WHERE repo_id = ANY($1)
+		  AND deleted_at IS NULL
+	`, repoIDs).Scan(&stats.TotalSkills, &stats.TotalDownloads, &stats.TotalStars, &stats.TotalInstalls)
+	if err != nil {
+		return DashboardStats{}, err
+	}
+
+	err = s.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM versions v
+		JOIN packages p ON p.id = v.package_id
+		WHERE p.repo_id = ANY($1)
+		  AND p.deleted_at IS NULL
+	`, repoIDs).Scan(&stats.TotalVersions)
+	if err != nil {
+		return DashboardStats{}, err
+	}
+
+	return stats, nil
+}
+
+type RepoStats struct {
+	Repository Repository
+	SkillCount int64
+}
+
+func (s *Store) GetRepoStats(ctx context.Context) ([]RepoStats, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT r.id, r.name, r.type::text, r.upstream_url, r.enabled,
+			COALESCE(cnt.n, 0)
+		FROM repositories r
+		LEFT JOIN (
+			SELECT repo_id, COUNT(*) AS n
+			FROM packages
+			WHERE deleted_at IS NULL
+			GROUP BY repo_id
+		) cnt ON cnt.repo_id = r.id
+		ORDER BY r.type, r.name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []RepoStats
+	for rows.Next() {
+		var rs RepoStats
+		if err := rows.Scan(
+			&rs.Repository.ID, &rs.Repository.Name, &rs.Repository.Type,
+			&rs.Repository.UpstreamURL, &rs.Repository.Enabled,
+			&rs.SkillCount,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, rs)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) DeleteRepository(ctx context.Context, id uuid.UUID) error {
+	ct, err := s.db.Exec(ctx, `DELETE FROM repositories WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+func (s *Store) UpdateRepositoryEnabled(ctx context.Context, id uuid.UUID, enabled bool) error {
+	ct, err := s.db.Exec(ctx, `UPDATE repositories SET enabled = $2 WHERE id = $1`, id, enabled)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
 func ValidateRepoType(repoType string) error {
 	switch repoType {
 	case RepoTypeHosted, RepoTypeProxy, RepoTypeGroup:
@@ -916,4 +1242,190 @@ func ValidateRole(role string) error {
 	default:
 		return fmt.Errorf("invalid role: %s", role)
 	}
+}
+
+// ---- Local Users ----
+
+type User struct {
+	ID           uuid.UUID `json:"id"`
+	Username     string    `json:"username"`
+	PasswordHash string    `json:"-"`
+	DisplayName  string    `json:"display_name"`
+	Email        string    `json:"email"`
+	IsAdmin      bool      `json:"is_admin"`
+	Disabled     bool      `json:"disabled"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+func (s *Store) CreateUser(ctx context.Context, username, passwordHash, displayName, email string, isAdmin bool) (User, error) {
+	var u User
+	err := s.db.QueryRow(ctx, `
+		INSERT INTO users (username, password_hash, display_name, email, is_admin)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, username, password_hash, display_name, email, is_admin, disabled, created_at
+	`, username, passwordHash, displayName, email, isAdmin).Scan(
+		&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Email, &u.IsAdmin, &u.Disabled, &u.CreatedAt,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return User{}, ErrConflict
+		}
+		return User{}, err
+	}
+	return u, nil
+}
+
+func (s *Store) GetUserByUsername(ctx context.Context, username string) (User, error) {
+	var u User
+	err := s.db.QueryRow(ctx, `
+		SELECT id, username, password_hash, display_name, email, is_admin, disabled, created_at
+		FROM users WHERE username = $1
+	`, username).Scan(
+		&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Email, &u.IsAdmin, &u.Disabled, &u.CreatedAt,
+	)
+	if err != nil {
+		return User{}, err
+	}
+	return u, nil
+}
+
+func (s *Store) ListUsers(ctx context.Context) ([]User, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, username, password_hash, display_name, email, is_admin, disabled, created_at
+		FROM users ORDER BY created_at
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var users []User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Email, &u.IsAdmin, &u.Disabled, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+func (s *Store) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
+	var u User
+	err := s.db.QueryRow(ctx, `
+		SELECT id, username, password_hash, display_name, email, is_admin, disabled, created_at
+		FROM users WHERE id = $1
+	`, id).Scan(
+		&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Email, &u.IsAdmin, &u.Disabled, &u.CreatedAt,
+	)
+	if err != nil {
+		return User{}, err
+	}
+	return u, nil
+}
+
+func (s *Store) UpdateUser(ctx context.Context, id uuid.UUID, displayName, email string, isAdmin, disabled bool) (User, error) {
+	var u User
+	err := s.db.QueryRow(ctx, `
+		UPDATE users SET display_name = $2, email = $3, is_admin = $4, disabled = $5
+		WHERE id = $1
+		RETURNING id, username, password_hash, display_name, email, is_admin, disabled, created_at
+	`, id, displayName, email, isAdmin, disabled).Scan(
+		&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Email, &u.IsAdmin, &u.Disabled, &u.CreatedAt,
+	)
+	if err != nil {
+		return User{}, err
+	}
+	return u, nil
+}
+
+func (s *Store) UpdateUserPassword(ctx context.Context, id uuid.UUID, passwordHash string) error {
+	ct, err := s.db.Exec(ctx, `UPDATE users SET password_hash = $2 WHERE id = $1`, id, passwordHash)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+func (s *Store) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	ct, err := s.db.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+// ---- Auth Config (LDAP) ----
+
+type AuthConfig struct {
+	ProviderType string          `json:"provider_type"`
+	Enabled      bool            `json:"enabled"`
+	Config       json.RawMessage `json:"config"`
+	UpdatedAt    time.Time       `json:"updated_at"`
+}
+
+func (s *Store) GetAuthConfig(ctx context.Context, providerType string) (AuthConfig, error) {
+	var ac AuthConfig
+	err := s.db.QueryRow(ctx,
+		`SELECT provider_type, enabled, config, updated_at FROM auth_configs WHERE provider_type = $1`,
+		providerType,
+	).Scan(&ac.ProviderType, &ac.Enabled, &ac.Config, &ac.UpdatedAt)
+	return ac, err
+}
+
+func (s *Store) ListAuthConfigs(ctx context.Context) ([]AuthConfig, error) {
+	rows, err := s.db.Query(ctx, `SELECT provider_type, enabled, config, updated_at FROM auth_configs ORDER BY provider_type`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var configs []AuthConfig
+	for rows.Next() {
+		var ac AuthConfig
+		if err := rows.Scan(&ac.ProviderType, &ac.Enabled, &ac.Config, &ac.UpdatedAt); err != nil {
+			return nil, err
+		}
+		configs = append(configs, ac)
+	}
+	return configs, rows.Err()
+}
+
+func (s *Store) UpsertAuthConfig(ctx context.Context, providerType string, enabled bool, config json.RawMessage) error {
+	_, err := s.db.Exec(ctx, `
+		INSERT INTO auth_configs (provider_type, enabled, config, updated_at)
+		VALUES ($1, $2, $3, now())
+		ON CONFLICT (provider_type) DO UPDATE
+		SET enabled = EXCLUDED.enabled, config = EXCLUDED.config, updated_at = now()
+	`, providerType, enabled, config)
+	return err
+}
+
+func (s *Store) DeleteAuthConfig(ctx context.Context, providerType string) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM auth_configs WHERE provider_type = $1`, providerType)
+	return err
+}
+
+// ---- System Config (generic key-value) ----
+
+func (s *Store) GetSystemConfig(ctx context.Context, key string) (json.RawMessage, error) {
+	var raw json.RawMessage
+	err := s.db.QueryRow(ctx,
+		`SELECT config FROM system_configs WHERE config_key = $1`, key,
+	).Scan(&raw)
+	return raw, err
+}
+
+func (s *Store) UpsertSystemConfig(ctx context.Context, key string, config json.RawMessage) error {
+	_, err := s.db.Exec(ctx, `
+		INSERT INTO system_configs (config_key, config, updated_at)
+		VALUES ($1, $2, now())
+		ON CONFLICT (config_key) DO UPDATE
+		SET config = EXCLUDED.config, updated_at = now()
+	`, key, config)
+	return err
 }

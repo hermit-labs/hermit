@@ -27,7 +27,7 @@ func TestWorker_RunOnceWhenNoInterval(t *testing.T) {
 		StartupDelay: 0,
 		Interval:     0,
 		PageSize:     10,
-	}, log.New(io.Discard, "", 0))
+	}, nil, log.New(io.Discard, "", 0))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -47,7 +47,7 @@ func TestWorker_RunRepeatedlyWithInterval(t *testing.T) {
 		StartupDelay: 0,
 		Interval:     15 * time.Millisecond,
 		PageSize:     10,
-	}, log.New(io.Discard, "", 0))
+	}, nil, log.New(io.Discard, "", 0))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Millisecond)
 	defer cancel()

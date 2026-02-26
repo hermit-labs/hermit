@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"hermit/internal/auth"
 	"hermit/internal/service"
 
 	"github.com/labstack/echo/v4"
@@ -24,13 +25,15 @@ func (h *Handler) Search(c echo.Context) error {
 		return mapServiceError(err)
 	}
 
+	actor := auth.GetActor(c)
+
 	query := strings.TrimSpace(c.QueryParam("q"))
 	if query == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "q is required")
 	}
 	limit := clampInt(queryInt(c, "limit", 20), 1, 200)
 
-	results, err := h.svc.SearchSkills(c.Request().Context(), repo, query, limit)
+	results, err := h.svc.SearchSkills(c.Request().Context(), repo, actor, query, limit)
 	if err != nil {
 		return mapServiceError(err)
 	}
@@ -55,6 +58,8 @@ func (h *Handler) ListSkills(c echo.Context) error {
 		return mapServiceError(err)
 	}
 
+	actor := auth.GetActor(c)
+
 	limit := clampInt(queryInt(c, "limit", 25), 1, 200)
 	offset, err := decodeCursor(c.QueryParam("cursor"))
 	if err != nil {
@@ -65,7 +70,7 @@ func (h *Handler) ListSkills(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	items, err := h.svc.ListSkills(c.Request().Context(), repo, limit+1, offset, sortBy)
+	items, err := h.svc.ListSkills(c.Request().Context(), repo, actor, limit+1, offset, sortBy)
 	if err != nil {
 		return mapServiceError(err)
 	}
@@ -117,8 +122,9 @@ func (h *Handler) GetSkill(c echo.Context) error {
 		return mapServiceError(err)
 	}
 
+	actor := auth.GetActor(c)
 	slug := strings.TrimSpace(c.Param("slug"))
-	view, err := h.svc.GetSkill(c.Request().Context(), repo, slug)
+	view, err := h.svc.GetSkill(c.Request().Context(), repo, actor, slug)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			return c.JSON(http.StatusOK, map[string]any{
@@ -164,6 +170,7 @@ func (h *Handler) ListVersions(c echo.Context) error {
 		return mapServiceError(err)
 	}
 
+	actor := auth.GetActor(c)
 	slug := strings.TrimSpace(c.Param("slug"))
 	limit := clampInt(queryInt(c, "limit", 25), 1, 200)
 	offset, err := decodeCursor(c.QueryParam("cursor"))
@@ -171,7 +178,7 @@ func (h *Handler) ListVersions(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid cursor")
 	}
 
-	versions, err := h.svc.ListSkillVersions(c.Request().Context(), repo, slug, limit+1, offset)
+	versions, err := h.svc.ListSkillVersions(c.Request().Context(), repo, actor, slug, limit+1, offset)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			return c.JSON(http.StatusOK, map[string]any{"items": []any{}, "nextCursor": nil})
@@ -205,9 +212,10 @@ func (h *Handler) GetVersion(c echo.Context) error {
 		return mapServiceError(err)
 	}
 
+	actor := auth.GetActor(c)
 	slug := strings.TrimSpace(c.Param("slug"))
 	version := strings.TrimSpace(c.Param("version"))
-	view, err := h.svc.GetSkillVersion(c.Request().Context(), repo, slug, version)
+	view, err := h.svc.GetSkillVersion(c.Request().Context(), repo, actor, slug, version)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			return c.JSON(http.StatusOK, map[string]any{"version": nil, "skill": nil})
@@ -236,12 +244,13 @@ func (h *Handler) GetSkillFile(c echo.Context) error {
 		return mapServiceError(err)
 	}
 
+	actor := auth.GetActor(c)
 	slug := strings.TrimSpace(c.Param("slug"))
 	filePath := strings.TrimSpace(c.QueryParam("path"))
 	version := strings.TrimSpace(c.QueryParam("version"))
 	tag := strings.TrimSpace(c.QueryParam("tag"))
 
-	content, err := h.svc.ReadSkillFile(c.Request().Context(), repo, slug, version, tag, filePath)
+	content, err := h.svc.ReadSkillFile(c.Request().Context(), repo, actor, slug, version, tag, filePath)
 	if err != nil {
 		return mapServiceError(err)
 	}
@@ -254,13 +263,14 @@ func (h *Handler) Resolve(c echo.Context) error {
 		return mapServiceError(err)
 	}
 
+	actor := auth.GetActor(c)
 	slug := strings.TrimSpace(c.QueryParam("slug"))
 	hash := strings.TrimSpace(c.QueryParam("hash"))
 	if slug == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "slug is required")
 	}
 
-	result, err := h.svc.ResolveSkillVersion(c.Request().Context(), repo, slug, hash)
+	result, err := h.svc.ResolveSkillVersion(c.Request().Context(), repo, actor, slug, hash)
 	if err != nil {
 		return mapServiceError(err)
 	}
@@ -284,6 +294,7 @@ func (h *Handler) Download(c echo.Context) error {
 		return mapServiceError(err)
 	}
 
+	actor := auth.GetActor(c)
 	slug := strings.TrimSpace(c.QueryParam("slug"))
 	version := strings.TrimSpace(c.QueryParam("version"))
 	tag := strings.TrimSpace(c.QueryParam("tag"))
@@ -291,7 +302,7 @@ func (h *Handler) Download(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "slug is required")
 	}
 
-	artifact, err := h.svc.DownloadArtifact(c.Request().Context(), repo, slug, version, tag, true)
+	artifact, err := h.svc.DownloadArtifact(c.Request().Context(), repo, actor, slug, version, tag, true)
 	if err != nil {
 		return mapServiceError(err)
 	}

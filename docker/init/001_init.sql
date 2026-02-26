@@ -114,9 +114,41 @@ CREATE TABLE IF NOT EXISTS proxy_cache (
   PRIMARY KEY (repo_id, package_name, version)
 );
 
-CREATE TABLE IF NOT EXISTS api_tokens (
-  token_hash TEXT PRIMARY KEY,
-  subject TEXT NOT NULL UNIQUE,
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  display_name TEXT NOT NULL DEFAULT '',
+  email TEXT NOT NULL DEFAULT '',
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   disabled BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS system_configs (
+  config_key TEXT PRIMARY KEY,
+  config JSONB NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS auth_configs (
+  provider_type TEXT PRIMARY KEY,
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  config JSONB NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS api_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  token_hash TEXT NOT NULL UNIQUE,
+  subject TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT '',
+  token_type TEXT NOT NULL DEFAULT 'personal',
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+  disabled BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_used_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_tokens_subject ON api_tokens (subject);
+CREATE INDEX IF NOT EXISTS idx_api_tokens_type_subject ON api_tokens (token_type, subject);

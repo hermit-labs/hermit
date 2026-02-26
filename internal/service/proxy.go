@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"hermit/internal/auth"
 	"hermit/internal/store"
 
 	"github.com/google/uuid"
@@ -19,6 +20,7 @@ import (
 func (s *Service) DownloadArtifact(
 	ctx context.Context,
 	repo store.Repository,
+	actor auth.Actor,
 	slug string,
 	version string,
 	tag string,
@@ -31,7 +33,7 @@ func (s *Service) DownloadArtifact(
 
 	artifactVersion := strings.TrimSpace(version)
 	if artifactVersion == "" && strings.TrimSpace(tag) != "" {
-		resolved, err := s.resolveTagVersionInRepo(ctx, repo, slug, tag, map[uuid.UUID]struct{}{})
+		resolved, err := s.resolveTagVersionInRepo(ctx, repo, actor, slug, tag, map[uuid.UUID]struct{}{})
 		if err != nil {
 			return store.Artifact{}, err
 		}
@@ -40,14 +42,14 @@ func (s *Service) DownloadArtifact(
 		}
 	}
 	if artifactVersion == "" {
-		latest, err := s.resolveLatestArtifactInRepo(ctx, repo, slug, map[uuid.UUID]struct{}{})
+		latest, err := s.resolveLatestArtifactInRepo(ctx, repo, actor, slug, map[uuid.UUID]struct{}{})
 		if err != nil {
 			return store.Artifact{}, err
 		}
 		artifactVersion = latest.Version
 	}
 
-	artifact, err := s.resolveInRepo(ctx, repo, slug, artifactVersion, map[uuid.UUID]struct{}{})
+	artifact, err := s.resolveInRepo(ctx, repo, actor, slug, artifactVersion, map[uuid.UUID]struct{}{})
 	if err != nil {
 		return store.Artifact{}, err
 	}

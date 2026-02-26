@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +14,7 @@ import (
 	"hermit/internal/auth"
 	"hermit/internal/config"
 	"hermit/internal/db"
+	"hermit/internal/extauth"
 	"hermit/internal/httpapi"
 	"hermit/internal/proxysync"
 	"hermit/internal/service"
@@ -57,35 +60,47 @@ func main() {
 		},
 	)
 	if cfg.BootstrapDefaults {
-		if err := svc.BootstrapDefaults(ctx, "admin"); err != nil {
+		if err := svc.BootstrapDefaults(ctx, cfg.AdminUsername, cfg.AdminPassword); err != nil {
 			log.Fatalf("bootstrap defaults: %v", err)
 		}
-	}
-	if cfg.ProxySyncEnabled {
-		factory := proxysync.NewAbstractFactory(
-			proxysync.FactoryDeps{
-				HTTPClient:      &http.Client{Timeout: cfg.ProxyTimeout},
-				VersionCacher:   svc,
-				SyncConcurrency: cfg.ProxySyncConcurrency,
-			},
-			proxysync.NewClawHubBuilder(),
-		)
-		runner := proxysync.NewRunner(svc, factory)
-		worker := proxysync.NewWorker(
-			runner,
-			proxysync.WorkerConfig{
-				Enabled:      true,
-				StartupDelay: cfg.ProxySyncDelay,
-				Interval:     cfg.ProxySyncInterval,
-				PageSize:     cfg.ProxySyncPageSize,
-			},
-			log.Default(),
-		)
-		go worker.Run(ctx)
+		if cfg.AdminPassword != "" {
+			log.Printf("initial admin user ensured (username: %s)", cfg.AdminUsername)
+		}
+
+		seedAuthConfigs(ctx, svc, cfg)
+		seedProxySyncConfig(ctx, svc, cfg)
 	}
 
+	// Proxy sync: always create runner/trigger, worker reads enabled flag from DB.
+	factory := proxysync.NewAbstractFactory(
+		proxysync.FactoryDeps{
+			HTTPClient:      &http.Client{Timeout: cfg.ProxyTimeout},
+			VersionCacher:   svc,
+			SyncConcurrency: cfg.ProxySyncConcurrency,
+		},
+		proxysync.NewClawHubBuilder(),
+	)
+	runner := proxysync.NewRunner(svc, factory)
+	configProvider := &syncConfigAdapter{svc: svc}
+
+	worker := proxysync.NewWorker(
+		runner,
+		proxysync.WorkerConfig{
+			Enabled:      true,
+			StartupDelay: cfg.ProxySyncDelay,
+			Interval:     cfg.ProxySyncInterval,
+			PageSize:     cfg.ProxySyncPageSize,
+		},
+		configProvider,
+		log.Default(),
+	)
+	go worker.Run(ctx)
+
+	syncTrigger := httpapi.NewSyncTrigger(runner, svc, cfg.ProxySyncPageSize, log.Default())
+
 	authn := auth.NewAuthenticator(pool, cfg.AdminToken)
-	api := httpapi.New(cfg, svc, authn)
+
+	api := httpapi.New(cfg, svc, authn, syncTrigger)
 	echoServer := api.NewEcho()
 
 	server := &http.Server{
@@ -109,5 +124,62 @@ func main() {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown error: %v", err)
 		os.Exit(1)
+	}
+}
+
+// syncConfigAdapter bridges service.Service to proxysync.ConfigProvider.
+type syncConfigAdapter struct {
+	svc *service.Service
+}
+
+func (a *syncConfigAdapter) GetWorkerConfig(ctx context.Context) (proxysync.WorkerConfig, error) {
+	cfg, err := a.svc.GetProxySyncConfig(ctx)
+	if err != nil {
+		return proxysync.WorkerConfig{}, err
+	}
+	return proxysync.WorkerConfig{
+		Enabled:      cfg.Enabled,
+		StartupDelay: cfg.Delay(),
+		Interval:     cfg.Interval(),
+		PageSize:     cfg.PageSizeOrDefault(),
+	}, nil
+}
+
+func seedAuthConfigs(ctx context.Context, svc *service.Service, cfg config.Config) {
+	if cfg.LDAPEnabled {
+		ldapCfg := extauth.LDAPConfig{
+			URL:          cfg.LDAPURL,
+			BaseDN:       cfg.LDAPBaseDN,
+			BindDN:       cfg.LDAPBindDN,
+			BindPassword: cfg.LDAPBindPassword,
+			UserFilter:   cfg.LDAPUserFilter,
+			UserAttr:     cfg.LDAPUserAttr,
+			DisplayAttr:  cfg.LDAPDisplayAttr,
+			StartTLS:     cfg.LDAPStartTLS,
+			SkipVerify:   cfg.LDAPSkipVerify,
+			AdminGroups:  cfg.LDAPAdminGroups,
+		}
+		raw, _ := json.Marshal(ldapCfg)
+		if err := svc.SeedAuthConfigFromEnv(ctx, service.ProviderTypeLDAP, true, raw); err != nil {
+			log.Printf("warning: seed LDAP config: %v", err)
+		} else {
+			log.Printf("LDAP config seeded from env vars")
+		}
+	}
+
+}
+
+func seedProxySyncConfig(ctx context.Context, svc *service.Service, cfg config.Config) {
+	psc := service.ProxySyncConfig{
+		Enabled:     cfg.ProxySyncEnabled,
+		IntervalStr: fmt.Sprintf("%s", cfg.ProxySyncInterval),
+		DelayStr:    fmt.Sprintf("%s", cfg.ProxySyncDelay),
+		PageSize:    cfg.ProxySyncPageSize,
+		Concurrency: cfg.ProxySyncConcurrency,
+	}
+	if err := svc.SeedProxySyncConfig(ctx, psc); err != nil {
+		log.Printf("warning: seed proxy sync config: %v", err)
+	} else {
+		log.Printf("proxy sync config seeded from env vars (enabled=%v)", cfg.ProxySyncEnabled)
 	}
 }
