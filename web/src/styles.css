@@ -38,7 +38,6 @@
 
 @plugin "daisyui/theme" {
   name: "hermit-dark";
-  prefersdark: true;
   --color-base-100: oklch(0.20 0.02 55);
   --color-base-200: oklch(0.25 0.02 55);
   --color-base-300: oklch(0.30 0.025 55);
@@ -67,6 +66,14 @@
   --noise: 0;
 }
 
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease,
+    box-shadow 0.3s ease, fill 0.3s ease, stroke 0.3s ease !important;
+}
+
 body {
   @apply m-0;
   font-family:
@@ -79,4 +86,87 @@ body {
 code {
   font-family:
     source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+/* Diff view */
+.diff-table {
+  border-spacing: 0;
+  line-height: 1.5;
+}
+.diff-table td {
+  padding: 0;
+  vertical-align: top;
+  white-space: pre;
+}
+.diff-table pre {
+  margin: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.diff-gutter {
+  width: 3.5em;
+  min-width: 3.5em;
+  padding: 0 6px;
+  text-align: right;
+  color: oklch(0.55 0 0);
+  user-select: none;
+  font-size: 11px;
+}
+.diff-sign {
+  width: 1.5em;
+  min-width: 1.5em;
+  text-align: center;
+  user-select: none;
+}
+.diff-code {
+  padding: 0 8px;
+  width: 100%;
+}
+.diff-added {
+  background: oklch(0.93 0.08 150);
+}
+.diff-added .diff-gutter {
+  background: oklch(0.88 0.10 150);
+  color: oklch(0.40 0.12 150);
+}
+.diff-added .diff-sign {
+  color: oklch(0.40 0.12 150);
+}
+.diff-removed {
+  background: oklch(0.93 0.06 25);
+}
+.diff-removed .diff-gutter {
+  background: oklch(0.88 0.08 25);
+  color: oklch(0.45 0.12 25);
+}
+.diff-removed .diff-sign {
+  color: oklch(0.45 0.12 25);
+}
+.diff-context .diff-gutter {
+  background: oklch(0.96 0 0);
+}
+
+[data-theme='hermit-dark'] .diff-added {
+  background: oklch(0.28 0.06 150);
+}
+[data-theme='hermit-dark'] .diff-added .diff-gutter {
+  background: oklch(0.25 0.08 150);
+  color: oklch(0.70 0.12 150);
+}
+[data-theme='hermit-dark'] .diff-added .diff-sign {
+  color: oklch(0.70 0.12 150);
+}
+[data-theme='hermit-dark'] .diff-removed {
+  background: oklch(0.28 0.06 25);
+}
+[data-theme='hermit-dark'] .diff-removed .diff-gutter {
+  background: oklch(0.25 0.08 25);
+  color: oklch(0.70 0.10 25);
+}
+[data-theme='hermit-dark'] .diff-removed .diff-sign {
+  color: oklch(0.70 0.10 25);
+}
+[data-theme='hermit-dark'] .diff-context .diff-gutter {
+  background: oklch(0.22 0.02 55);
 }

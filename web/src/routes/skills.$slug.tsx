@@ -5,6 +5,7 @@ import { api, formatDate, timeAgo } from '#/api'
 import { MarkdownContent } from '#/components/MarkdownContent'
 import { FileExplorer } from '#/components/FileExplorer'
 import { VersionList } from '#/components/VersionList'
+import { VersionCompare } from '#/components/VersionCompare'
 import { SkeletonLines } from '#/components/SkeletonLines'
 import { useState } from 'react'
 
@@ -212,9 +213,11 @@ function SkillDetailPage() {
 
           {/* Compare tab */}
           {activeTab === 'compare' && (
-            <div className="text-center py-12 text-base-content/40 text-sm">
-              Select two versions to compare
-            </div>
+            <VersionCompare
+              slug={slug}
+              versions={versionsListData?.items ?? []}
+              latestVersion={latestVersion?.version}
+            />
           )}
 
           {/* Versions tab */}

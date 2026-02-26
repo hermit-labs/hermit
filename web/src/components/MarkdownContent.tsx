@@ -1,7 +1,8 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import SyntaxHighlighter from 'react-syntax-highlighter'
-import { githubGist } from 'react-syntax-highlighter/dist/esm/styles/hljs'
+import { githubGist, vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs'
+import { useTheme } from '#/hooks/useTheme'
 
 function stripFrontMatter(content: string): string {
   return content.replace(/^---[\s\S]*?---\n?/, '').trimStart()
@@ -14,6 +15,7 @@ export function MarkdownContent({
   content: string
   stripHeading?: boolean
 }) {
+  const { isDark: dark } = useTheme()
   const rendered = stripHeading ? stripFrontMatter(content) : content
   return (
     <ReactMarkdown
@@ -53,7 +55,7 @@ export function MarkdownContent({
           return (
             <SyntaxHighlighter
               language={lang}
-              style={githubGist}
+              style={dark ? vs2015 : githubGist}
               customStyle={{
                 margin: '8px 0',
                 borderRadius: '6px',

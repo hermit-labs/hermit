@@ -1,11 +1,14 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#D47A3E" />
-    <title>hermit - Skill Registry</title>
+    <title>Hermit - Skill Registry</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      (function(){var s=localStorage.getItem('hermit-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.setAttribute('data-theme',d?'hermit-dark':'hermit-light')})()
+    </script>
   </head>
   <body>
     <div id="root"></div>

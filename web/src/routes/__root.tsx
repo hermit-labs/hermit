@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react'
 
 import '../styles.css'
 import TanStackQueryProvider from '../integrations/tanstack-query/root-provider'
+import { ThemeProvider } from '#/hooks/useTheme'
 import {
   getToken,
   setToken as saveToken,
@@ -63,23 +64,25 @@ function RootComponent() {
   }, [handleLogin])
 
   return (
-    <TanStackQueryProvider>
-      <div className="min-h-screen bg-base-100">
-        <Navbar
-          loggedIn={!!token}
-          onSignIn={() => setLoginOpen(true)}
-          onSignOut={handleLogout}
-        />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-          <Outlet />
-        </main>
-        {loginOpen && (
-          <SignInModal
-            onLogin={handleLogin}
-            onClose={() => setLoginOpen(false)}
+    <ThemeProvider>
+      <TanStackQueryProvider>
+        <div className="min-h-screen bg-base-100">
+          <Navbar
+            loggedIn={!!token}
+            onSignIn={() => setLoginOpen(true)}
+            onSignOut={handleLogout}
           />
-        )}
-      </div>
-    </TanStackQueryProvider>
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+            <Outlet />
+          </main>
+          {loginOpen && (
+            <SignInModal
+              onLogin={handleLogin}
+              onClose={() => setLoginOpen(false)}
+            />
+          )}
+        </div>
+      </TanStackQueryProvider>
+    </ThemeProvider>
   )
 }
