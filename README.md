@@ -26,9 +26,18 @@ Every hermit instance bootstraps three repository types that work together:
 
 ### Tech Stack
 
-- **Language**: Go 1.24 + [Echo](https://echo.labstack.com/) v4
-- **Database**: PostgreSQL 16
-- **Storage**: Local filesystem blob store
+**Server**
+
+- Go 1.24 + [Echo](https://echo.labstack.com/) v4
+- PostgreSQL 16
+- Local filesystem blob store
+
+**Web Frontend**
+
+- React 19 + TypeScript
+- [TanStack Router](https://tanstack.com/router) + [TanStack Query](https://tanstack.com/query)
+- Tailwind CSS 4 + [daisyUI](https://daisyui.com/) 5
+- Vite 7
 
 ---
 
@@ -74,15 +83,51 @@ go run ./cmd/server
 
 Default listen address: `http://localhost:8080`.
 
-### 4. Run Web Frontend (optional)
+### 4. Run Web Frontend
 
 ```bash
-cd ../web
-npm install
-npm run dev
+cd web
+pnpm install
+pnpm dev
 ```
 
 Frontend runs on `http://localhost:5173` and proxies `/api` requests to the backend.
+
+---
+
+## Web Frontend
+
+The bundled SPA provides a full-featured UI for browsing, publishing, and managing skills.
+
+### Pages
+
+| Route | Description |
+|-------|-------------|
+| `/` | Skill catalog with search, sort, and pagination |
+| `/skills/:slug` | Skill detail — files, version compare, version history |
+| `/search?q=...` | Full-text search |
+| `/publish` | Publish a new skill version (drag-and-drop file upload) |
+| `/admin` | Admin dashboard (stats, skills, sync, RBAC, users, auth, tokens) |
+
+### Skill Detail Tabs
+
+- **Files** — file explorer with syntax-highlighted preview for source files and rendered Markdown for `.md` files.
+- **Compare** — side-by-side unified diff between any two versions. Defaults to latest vs previous; shows added / removed / modified files with line-level changes.
+- **Versions** — chronological version history with changelogs.
+
+### Admin Dashboard
+
+- **Stats** — total skills, versions, downloads, stars, installs, and per-repository breakdown.
+- **Skills** — manage all skills (soft-delete / restore).
+- **Sync** — configure proxy sync sources, trigger manual sync, view sync status and config.
+- **RBAC** — assign per-repository roles (`admin` / `developer` / `viewer`).
+- **Users** — create, update, disable local users and reset passwords.
+- **Auth** — configure authentication providers (local + LDAP).
+- **Tokens** — mint admin tokens for any user.
+
+### Theming
+
+Light (`hermit-light`) and dark (`hermit-dark`) themes with automatic system preference detection and manual toggle.
 
 ---
 
@@ -101,21 +146,54 @@ GET  /api/v1/resolve?slug=&hash=                    Resolve by hash
 GET  /api/v1/download?slug=&version=&tag=           Download archive
 ```
 
+### Auth Endpoints (No Token Required)
+
+```
+GET  /api/v1/auth/providers                         List auth providers
+POST /api/v1/auth/login                             Local login
+POST /api/v1/auth/ldap                              LDAP login
+```
+
 ### Authenticated Endpoints
 
 > Requires `Authorization: Bearer <token>` header.
 
 ```
-POST   /api/v1/skills                  Publish a skill
-DELETE /api/v1/skills/{slug}           Soft-delete a skill
-POST   /api/v1/skills/{slug}/undelete  Restore a soft-deleted skill
-GET    /api/v1/whoami                  Token introspection
+GET    /api/v1/whoami                   Token introspection
+POST   /api/v1/skills                   Publish a skill
+DELETE /api/v1/skills/{slug}            Soft-delete a skill
+POST   /api/v1/skills/{slug}/undelete   Restore a soft-deleted skill
+GET    /api/v1/tokens                   List personal access tokens
+POST   /api/v1/tokens                   Create personal access token
+DELETE /api/v1/tokens/{tokenId}         Revoke personal access token
 ```
 
 ### Internal (Admin Only)
 
 ```
-POST /api/internal/tokens              Mint a user token
+POST   /api/internal/tokens                              Mint a user token
+GET    /api/internal/stats                               Dashboard stats
+GET    /api/internal/sync-sources                        List sync sources
+POST   /api/internal/sync-sources                        Add sync source
+DELETE /api/internal/sync-sources/{id}                   Remove sync source
+PATCH  /api/internal/sync-sources/{id}                   Toggle sync source
+POST   /api/internal/sync                                Trigger sync
+GET    /api/internal/sync/status                         Sync status
+GET    /api/internal/sync/config                         Get sync config
+PUT    /api/internal/sync/config                         Update sync config
+GET    /api/internal/rbac/members                        List all RBAC members
+GET    /api/internal/rbac/repos/{id}/members             List repo members
+POST   /api/internal/rbac/repos/{id}/members             Assign member role
+DELETE /api/internal/rbac/repos/{id}/members/{subject}   Remove member
+GET    /api/internal/users                               List users
+POST   /api/internal/users                               Create user
+PATCH  /api/internal/users/{id}                          Update user
+POST   /api/internal/users/{id}/reset-password           Reset password
+DELETE /api/internal/users/{id}                          Delete user
+GET    /api/internal/auth-configs                        List auth configs
+GET    /api/internal/auth-configs/{type}                 Get auth config
+PUT    /api/internal/auth-configs/{type}                 Save auth config
+DELETE /api/internal/auth-configs/{type}                 Delete auth config
 ```
 
 ---
@@ -185,3 +263,4 @@ curl -s \
 - **Proxy lazy cache** — upstream skills are fetched on first request and cached locally; a negative cache prevents repeated misses.
 - **Group as single entrance** — Hosted and Proxy are internal; the public API always reads through the Group repository.
 - **Background sync** — when `PROXY_SYNC_ENABLED=true`, a worker proactively crawls the upstream catalog into the proxy cache instead of waiting for the first download hit.
+- **Client-side version diff** — the Compare tab fetches file content for two versions and computes unified diffs in the browser using the `diff` library, requiring no server-side diff endpoint.
