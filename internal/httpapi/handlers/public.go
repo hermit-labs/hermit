@@ -307,14 +307,14 @@ func (h *Handler) Download(c echo.Context) error {
 		return mapServiceError(err)
 	}
 
-	file, info, err := h.svc.BlobStore().Open(artifact.BlobPath)
+	file, err := h.svc.BlobStore().Open(c.Request().Context(), artifact.BlobPath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
 	c.Response().Header().Set(echo.HeaderContentType, "application/zip")
-	c.Response().Header().Set(echo.HeaderContentLength, strconv.FormatInt(info.Size(), 10))
+	c.Response().Header().Set(echo.HeaderContentLength, strconv.FormatInt(file.Size(), 10))
 	c.Response().Header().Set("ETag", artifact.Digest)
 	c.Response().Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", artifact.FileName))
 	return c.Stream(http.StatusOK, "application/zip", file)

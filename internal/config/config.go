@@ -12,7 +12,18 @@ import (
 type Config struct {
 	ListenAddr           string
 	DatabaseURL          string
-	StorageRoot          string
+	StorageBackend       string // "local" (default) or "s3"
+	StorageRoot          string // local backend root dir
+
+	// S3-compatible storage
+	S3Endpoint        string
+	S3Region          string
+	S3Bucket          string
+	S3Prefix          string
+	S3AccessKeyID     string
+	S3SecretAccessKey string
+	S3ForcePathStyle  bool
+
 	AdminToken           string
 	CORSAllowedOrigins   []string
 	DefaultHostedRepo    string
@@ -73,6 +84,16 @@ func Load() (Config, error) {
 		HTTPWriteTimeout:     getenvDuration("HTTP_WRITE_TIMEOUT", 60*time.Second),
 		HTTPIdleTimeout:      getenvDuration("HTTP_IDLE_TIMEOUT", 60*time.Second),
 	}
+	// Storage backend
+	cfg.StorageBackend = getenv("STORAGE_BACKEND", "local")
+	cfg.S3Endpoint = getenv("S3_ENDPOINT", "")
+	cfg.S3Region = getenv("S3_REGION", "us-east-1")
+	cfg.S3Bucket = getenv("S3_BUCKET", "")
+	cfg.S3Prefix = getenv("S3_PREFIX", "")
+	cfg.S3AccessKeyID = getenv("S3_ACCESS_KEY_ID", "")
+	cfg.S3SecretAccessKey = getenv("S3_SECRET_ACCESS_KEY", "")
+	cfg.S3ForcePathStyle = getenvBool("S3_FORCE_PATH_STYLE", true)
+
 	cfg.CORSAllowedOrigins = parseList(getenv("CORS_ALLOWED_ORIGINS", strings.Join(defaultCORSOrigins, ",")))
 	if len(cfg.CORSAllowedOrigins) == 0 {
 		cfg.CORSAllowedOrigins = defaultCORSOrigins

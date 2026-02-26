@@ -92,7 +92,7 @@ func (s *Service) ensureAdminUser(ctx context.Context, username, password string
 	return err
 }
 
-func (s *Service) BlobStore() *storage.BlobStore {
+func (s *Service) BlobStore() storage.BlobStorage {
 	return s.blobs
 }
 

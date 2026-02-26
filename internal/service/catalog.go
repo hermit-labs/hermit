@@ -262,13 +262,13 @@ func (s *Service) ReadSkillFile(
 	if err != nil {
 		return nil, err
 	}
-	f, info, err := s.blobs.Open(artifact.BlobPath)
+	f, err := s.blobs.Open(ctx, artifact.BlobPath)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	zipReader, err := zip.NewReader(f, info.Size())
+	zipReader, err := zip.NewReader(f, f.Size())
 	if err != nil {
 		return nil, fmt.Errorf("%w: artifact is not a zip", ErrInvalidInput)
 	}

@@ -20,6 +20,10 @@ import (
 	"hermit/internal/service"
 	"hermit/internal/storage"
 	"hermit/internal/store"
+
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 func main() {
@@ -41,7 +45,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	blobStore, err := storage.NewBlobStore(cfg.StorageRoot)
+	blobStore, err := initBlobStorage(ctx, cfg)
 	if err != nil {
 		log.Fatalf("init storage: %v", err)
 	}
@@ -181,5 +185,46 @@ func seedProxySyncConfig(ctx context.Context, svc *service.Service, cfg config.C
 		log.Printf("warning: seed proxy sync config: %v", err)
 	} else {
 		log.Printf("proxy sync config seeded from env vars (enabled=%v)", cfg.ProxySyncEnabled)
+	}
+}
+
+func initBlobStorage(ctx context.Context, cfg config.Config) (storage.BlobStorage, error) {
+	switch cfg.StorageBackend {
+	case "s3":
+		if cfg.S3Bucket == "" {
+			return nil, fmt.Errorf("S3_BUCKET is required when STORAGE_BACKEND=s3")
+		}
+		opts := []func(*awsconfig.LoadOptions) error{
+			awsconfig.WithRegion(cfg.S3Region),
+		}
+		if cfg.S3AccessKeyID != "" {
+			opts = append(opts, awsconfig.WithCredentialsProvider(
+				credentials.NewStaticCredentialsProvider(cfg.S3AccessKeyID, cfg.S3SecretAccessKey, ""),
+			))
+		}
+		awsCfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
+		if err != nil {
+			return nil, fmt.Errorf("load AWS config: %w", err)
+		}
+
+		s3Opts := []func(*s3.Options){}
+		if cfg.S3Endpoint != "" {
+			s3Opts = append(s3Opts, func(o *s3.Options) {
+				o.BaseEndpoint = &cfg.S3Endpoint
+				o.UsePathStyle = cfg.S3ForcePathStyle
+			})
+		}
+		client := s3.NewFromConfig(awsCfg, s3Opts...)
+
+		log.Printf("storage backend: s3 (bucket=%s, endpoint=%s)", cfg.S3Bucket, cfg.S3Endpoint)
+		return storage.NewS3BlobStore(storage.S3Options{
+			Client: client,
+			Bucket: cfg.S3Bucket,
+			Prefix: cfg.S3Prefix,
+		}), nil
+
+	default:
+		log.Printf("storage backend: local (%s)", cfg.StorageRoot)
+		return storage.NewLocalBlobStore(cfg.StorageRoot)
 	}
 }

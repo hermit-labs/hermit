@@ -141,11 +141,11 @@ func (s *Service) fetchAndCacheProxy(
 		}
 		fileName := resolveFileName(resp, slug, version)
 
-		blobFile, blobInfo, err := s.blobs.Open(blobPath)
+		blobFile, err := s.blobs.Open(ctx, blobPath)
 		if err != nil {
 			return store.Artifact{}, err
 		}
-		fileDescriptors, err := describeZipArchiveFiles(blobFile, blobInfo.Size())
+		fileDescriptors, err := describeZipArchiveFiles(blobFile, blobFile.Size())
 		closeErr := blobFile.Close()
 		if err != nil {
 			return store.Artifact{}, err

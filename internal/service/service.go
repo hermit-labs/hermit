@@ -61,7 +61,7 @@ type ResolveView struct {
 
 type Service struct {
 	store            *store.Store
-	blobs            *storage.BlobStore
+	blobs            storage.BlobStorage
 	httpClient       *http.Client
 	proxyNegativeTTL time.Duration
 	defaults         Defaults
@@ -71,7 +71,7 @@ type Service struct {
 
 func New(
 	st *store.Store,
-	blobs *storage.BlobStore,
+	blobs storage.BlobStorage,
 	proxyTimeout time.Duration,
 	proxyNegativeTTL time.Duration,
 	defaults Defaults,

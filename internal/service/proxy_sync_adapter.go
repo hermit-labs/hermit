@@ -165,11 +165,11 @@ func (s *Service) ensureProxyVersionFiles(
 		return err
 	}
 
-	blobFile, info, err := s.blobs.Open(artifact.BlobPath)
+	blobFile, err := s.blobs.Open(ctx, artifact.BlobPath)
 	if err != nil {
 		return err
 	}
-	descriptors, err := describeZipArchiveFiles(blobFile, info.Size())
+	descriptors, err := describeZipArchiveFiles(blobFile, blobFile.Size())
 	closeErr := blobFile.Close()
 	if err != nil {
 		return err
