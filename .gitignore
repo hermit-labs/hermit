@@ -1,0 +1,41 @@
+# OS
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Go build/test artifacts
+bin/
+dist/
+*.test
+*.out
+coverage.out
+*.coverprofile
+
+# Runtime data (default STORAGE_ROOT=./data)
+data/
+
+# Web (Vinxi/TanStack Start) artifacts
+web/node_modules/
+web/dist/
+web/.vinxi/
+web/.nitro/
+web/.output/
+web/.cache/
+web/.turbo/
+web/.vite/
+web/app.config.timestamp_*.js
+web/.env
+web/.env.local
+web/.env.*.local
