@@ -2,6 +2,9 @@ package httpapi
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -22,11 +25,13 @@ func (a *API) registerRoutes(e *echo.Echo) {
 	a.registerPublicV1Routes(v1)
 	a.registerAuthV1Routes(v1)
 	a.registerInternalRoutes(e)
+
+	if a.webDir != "" {
+		a.registerSPARoutes(e)
+	}
 }
 
 func (a *API) registerPublicV1Routes(v1 *echo.Group) {
-	// Apply optional auth so public endpoints can identify the caller
-	// for repository-level access filtering.
 	v1.Use(a.auth.OptionalMiddleware)
 
 	v1.GET("/search", a.handler.Search)
@@ -92,4 +97,33 @@ func (a *API) registerInternalRoutes(e *echo.Echo) {
 	internal.GET("/auth-configs/:type", a.handler.GetAuthConfig)
 	internal.PUT("/auth-configs/:type", a.handler.SaveAuthConfig)
 	internal.DELETE("/auth-configs/:type", a.handler.DeleteAuthConfig)
+}
+
+// registerSPARoutes serves the frontend SPA from webDir.
+// Static assets are served directly; all other paths fall back to index.html.
+func (a *API) registerSPARoutes(e *echo.Echo) {
+	fs := http.Dir(a.webDir)
+	fileServer := http.FileServer(fs)
+	indexPath := filepath.Join(a.webDir, "index.html")
+
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			p := c.Request().URL.Path
+			if strings.HasPrefix(p, "/api/") ||
+				strings.HasPrefix(p, "/.well-known/") ||
+				p == "/healthz" {
+				return next(c)
+			}
+
+			// Try to serve a real file (JS, CSS, images, etc.)
+			filePath := filepath.Join(a.webDir, filepath.Clean(p))
+			if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
+				fileServer.ServeHTTP(c.Response(), c.Request())
+				return nil
+			}
+
+			// SPA fallback: serve index.html for all other routes
+			return c.File(indexPath)
+		}
+	})
 }

@@ -18,6 +18,7 @@ type API struct {
 	auth        *auth.Authenticator
 	handler     *handlers.Handler
 	syncTrigger *SyncTrigger
+	webDir      string // path to frontend dist; empty = disabled
 }
 
 func New(
@@ -25,12 +26,14 @@ func New(
 	svc *service.Service,
 	authn *auth.Authenticator,
 	syncTrigger *SyncTrigger,
+	webDir string,
 ) *API {
 	return &API{
 		cfg:         cfg,
 		auth:        authn,
 		handler:     handlers.New(cfg, svc, authn, syncTrigger),
 		syncTrigger: syncTrigger,
+		webDir:      webDir,
 	}
 }
 

@@ -24,6 +24,9 @@ type Config struct {
 	S3SecretAccessKey string
 	S3ForcePathStyle  bool
 
+	// Frontend SPA directory (empty = disabled)
+	WebDir string
+
 	AdminToken           string
 	CORSAllowedOrigins   []string
 	DefaultHostedRepo    string
@@ -93,6 +96,8 @@ func Load() (Config, error) {
 	cfg.S3AccessKeyID = getenv("S3_ACCESS_KEY_ID", "")
 	cfg.S3SecretAccessKey = getenv("S3_SECRET_ACCESS_KEY", "")
 	cfg.S3ForcePathStyle = getenvBool("S3_FORCE_PATH_STYLE", true)
+
+	cfg.WebDir = getenv("WEB_DIR", "")
 
 	cfg.CORSAllowedOrigins = parseList(getenv("CORS_ALLOWED_ORIGINS", strings.Join(defaultCORSOrigins, ",")))
 	if len(cfg.CORSAllowedOrigins) == 0 {

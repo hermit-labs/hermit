@@ -104,7 +104,7 @@ func main() {
 
 	authn := auth.NewAuthenticator(pool, cfg.AdminToken)
 
-	api := httpapi.New(cfg, svc, authn, syncTrigger)
+	api := httpapi.New(cfg, svc, authn, syncTrigger, cfg.WebDir)
 	echoServer := api.NewEcho()
 
 	server := &http.Server{
