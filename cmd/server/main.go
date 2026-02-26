@@ -83,7 +83,7 @@ func main() {
 		},
 		proxysync.NewClawHubBuilder(),
 	)
-	runner := proxysync.NewRunner(svc, factory)
+	runner := proxysync.NewRunner(svc, factory, log.Default())
 	syncTrigger := httpapi.NewSyncTrigger(runner, svc, cfg.ProxySyncPageSize, log.Default())
 
 	authn := auth.NewAuthenticator(pool, cfg.AdminToken)

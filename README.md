@@ -2,7 +2,7 @@
   <img src="assets/hermit-crab.svg" width="128" alt="hermit" />
 </p>
 
-<h1 align="center">hermit</h1>
+<h1 align="center">Hermit</h1>
 
 <p align="center">
   Private, self-hosted skill registry server — ClawHub-compatible, with Repository Trio semantics.

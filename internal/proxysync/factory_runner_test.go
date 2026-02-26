@@ -105,6 +105,7 @@ func TestRunner_AggregatesStats(t *testing.T) {
 				"proxy-b": fakeRepoSyncer{stats: RepoStats{Repository: "proxy-b", Skills: 1, Versions: 2, Cached: 1, Failed: 1}},
 			},
 		},
+		nil,
 	)
 
 	got, err := runner.Run(context.Background(), 100)

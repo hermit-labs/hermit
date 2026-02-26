@@ -44,7 +44,7 @@ export function Navbar({
         <div className="navbar-start">
           <Link to="/" className="flex items-center gap-2 font-bold text-lg">
             <img src="/hermit-crab.svg" alt="hermit" className="h-7 w-7" />
-            <span>hermit</span>
+            <span>Hermit</span>
           </Link>
         </div>
         <div className="navbar-end gap-2">

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -40,6 +41,10 @@ func (clawHubBuilder) Build(repo store.Repository, deps FactoryDeps) (RepoSyncer
 	if concurrency <= 0 {
 		concurrency = 4
 	}
+	logger := deps.Logger
+	if logger == nil {
+		logger = log.Default()
+	}
 	return &clawHubSyncer{
 		repo:                repo,
 		client:              client,
@@ -48,6 +53,7 @@ func (clawHubBuilder) Build(repo store.Repository, deps FactoryDeps) (RepoSyncer
 		syncConcurrency:     concurrency,
 		sleepFn:             sleepWithContext,
 		jitterFn:            addJitter,
+		logger:              logger,
 	}, nil
 }
 
@@ -59,6 +65,7 @@ type clawHubSyncer struct {
 	syncConcurrency     int
 	sleepFn             func(context.Context, time.Duration) error
 	jitterFn            func(time.Duration) time.Duration
+	logger              *log.Logger
 }
 
 type upstreamSkillsListResponse struct {
@@ -102,19 +109,28 @@ func (s *clawHubSyncer) Sync(ctx context.Context, pageSize int) (RepoStats, erro
 	}
 	stats := RepoStats{Repository: s.repo.Name}
 
+	s.logger.Printf("[sync] [%s] starting sync (upstream=%s, pageSize=%d)", s.repo.Name, *s.repo.UpstreamURL, pageSize)
+
 	cursor := ""
+	pageNum := 0
 	for {
 		if err := ctx.Err(); err != nil {
+			s.logger.Printf("[sync] [%s] context cancelled, aborting", s.repo.Name)
 			return stats, err
 		}
 
+		pageNum++
+		s.logger.Printf("[sync] [%s] fetching skills page %d", s.repo.Name, pageNum)
 		page, err := s.fetchSkillsPage(ctx, pageSize, cursor)
 		if err != nil {
+			s.logger.Printf("[sync] [%s] failed to fetch skills page %d: %v", s.repo.Name, pageNum, err)
 			return stats, err
 		}
+		s.logger.Printf("[sync] [%s] skills page %d returned %d items", s.repo.Name, pageNum, len(page.Items))
 
 		for _, item := range page.Items {
 			if err := ctx.Err(); err != nil {
+				s.logger.Printf("[sync] [%s] context cancelled, aborting", s.repo.Name)
 				return stats, err
 			}
 
@@ -136,18 +152,25 @@ func (s *clawHubSyncer) Sync(ctx context.Context, pageSize int) (RepoStats, erro
 
 			versions, err := s.fetchAllVersions(ctx, slug, pageSize)
 			if err != nil {
+				s.logger.Printf("[sync] [%s] skill %q: failed to fetch versions: %v", s.repo.Name, slug, err)
 				if latest.version == "" {
 					stats.Failed++
 					continue
 				}
+				s.logger.Printf("[sync] [%s] skill %q: falling back to latest version %q", s.repo.Name, slug, latest.version)
 				versions = []syncVersion{latest}
 			}
 
 			versions = normalizeVersions(versions, latest)
+			s.logger.Printf("[sync] [%s] skill %q: syncing %d versions", s.repo.Name, slug, len(versions))
 			stats.Versions += len(versions)
 			cached, failed := s.syncVersions(ctx, slug, versions)
 			stats.Cached += cached
 			stats.Failed += failed
+
+			if failed > 0 {
+				s.logger.Printf("[sync] [%s] skill %q: cached=%d failed=%d", s.repo.Name, slug, cached, failed)
+			}
 
 			if metaCacher, ok := s.cache.(ProxySkillMetaCacher); ok {
 				if err := metaCacher.SyncProxySkillMeta(
@@ -158,6 +181,7 @@ func (s *clawHubSyncer) Sync(ctx context.Context, pageSize int) (RepoStats, erro
 					normalizeSummary(item.Summary),
 					normalizeTagPatch(item.Tags),
 				); err != nil {
+					s.logger.Printf("[sync] [%s] skill %q: failed to sync skill metadata: %v", s.repo.Name, slug, err)
 					stats.Failed++
 				}
 			}
@@ -168,6 +192,9 @@ func (s *clawHubSyncer) Sync(ctx context.Context, pageSize int) (RepoStats, erro
 		}
 		cursor = strings.TrimSpace(*page.NextCursor)
 	}
+
+	s.logger.Printf("[sync] [%s] sync complete: skills=%d versions=%d cached=%d failed=%d",
+		s.repo.Name, stats.Skills, stats.Versions, stats.Cached, stats.Failed)
 	return stats, nil
 }
 
@@ -188,6 +215,7 @@ func (s *clawHubSyncer) syncVersions(ctx context.Context, slug string, versions 
 	if workers == 1 {
 		for _, item := range versions {
 			if err := s.cache.SyncProxyVersion(ctx, s.repo, slug, item.version); err != nil {
+				s.logger.Printf("[sync] [%s] skill %q version %q: cache failed: %v", s.repo.Name, slug, item.version, err)
 				failed++
 				continue
 			}
@@ -201,6 +229,7 @@ func (s *clawHubSyncer) syncVersions(ctx context.Context, slug string, versions 
 					item.changelog,
 					item.changelogSource,
 				); err != nil {
+					s.logger.Printf("[sync] [%s] skill %q version %q: version meta sync failed: %v", s.repo.Name, slug, item.version, err)
 					failed++
 				}
 			}
@@ -218,6 +247,7 @@ func (s *clawHubSyncer) syncVersions(ctx context.Context, slug string, versions 
 		defer wg.Done()
 		for item := range jobs {
 			if err := s.cache.SyncProxyVersion(ctx, s.repo, slug, item.version); err != nil {
+				s.logger.Printf("[sync] [%s] skill %q version %q: cache failed: %v", s.repo.Name, slug, item.version, err)
 				atomic.AddInt64(&failedCount, 1)
 				continue
 			}
@@ -231,6 +261,7 @@ func (s *clawHubSyncer) syncVersions(ctx context.Context, slug string, versions 
 					item.changelog,
 					item.changelogSource,
 				); err != nil {
+					s.logger.Printf("[sync] [%s] skill %q version %q: version meta sync failed: %v", s.repo.Name, slug, item.version, err)
 					atomic.AddInt64(&failedCount, 1)
 				}
 			}
@@ -330,8 +361,10 @@ func (s *clawHubSyncer) getJSON(ctx context.Context, requestURL string, out any)
 			delay := retryDelayFromHeadersWithJitter(resp.Header, time.Now().UTC(), s.jitterFn)
 			_ = resp.Body.Close()
 			if attempt >= retries {
+				s.logger.Printf("[sync] [%s] rate limited (429) after %d retries, giving up: %s", s.repo.Name, retries, requestURL)
 				return fmt.Errorf("upstream status 429 after %d retries", retries)
 			}
+			s.logger.Printf("[sync] [%s] rate limited (429), retry %d/%d after %s: %s", s.repo.Name, attempt+1, retries, delay, requestURL)
 			if delay > 0 && s.sleepFn != nil {
 				if err := s.sleepFn(ctx, delay); err != nil {
 					return err
@@ -343,6 +376,7 @@ func (s *clawHubSyncer) getJSON(ctx context.Context, requestURL string, out any)
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 			_ = resp.Body.Close()
+			s.logger.Printf("[sync] [%s] upstream error %d: %s (url=%s)", s.repo.Name, resp.StatusCode, strings.TrimSpace(string(body)), requestURL)
 			return fmt.Errorf("upstream status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 		}
 		defer resp.Body.Close()

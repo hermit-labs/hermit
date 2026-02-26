@@ -2,6 +2,7 @@ package proxysync
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -12,6 +13,7 @@ type FactoryDeps struct {
 	HTTPClient      *http.Client
 	VersionCacher   VersionCacher
 	SyncConcurrency int
+	Logger          *log.Logger
 }
 
 type Builder interface {
