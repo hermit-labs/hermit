@@ -22,7 +22,7 @@ Every hermit instance bootstraps three repository types that work together:
 |------|------|
 | **Hosted** | Private publish target — your first-party skills live here. |
 | **Proxy** | Lazy-caching mirror of one or more upstreams (e.g. ClawHub). Fetches on first hit, then serves from local cache. |
-| **Group** | Unified read endpoint that merges Hosted + Proxy. All public API reads go through Group. |
+| **Group** | Unified read endpoint that merges Hosted + Proxy. All catalog read APIs go through Group. |
 
 ### Tech Stack
 
@@ -116,7 +116,7 @@ Per-repository role assignment with three levels:
 | `push` | Publish skills (includes read) |
 | `admin` | Full control (includes push) |
 
-Admin users bypass RBAC checks. Anonymous requests use the Group repository's public access.
+Admin users bypass RBAC checks. All API reads/writes run under an authenticated subject.
 
 ### Rate Limiting
 
@@ -145,6 +145,11 @@ Response headers: `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-R
 ## API
 
 hermit is fully compatible with the [ClawHub](https://clawhub.ai) API — any ClawHub-compatible CLI or client works without modification. The server also exposes a `/.well-known/clawhub.json` discovery document and a `/healthz` health-check endpoint.
+
+All `/api/v1/*` and `/api/internal/*` endpoints require authentication, except:
+- `/api/v1/auth/providers`
+- `/api/v1/auth/login`
+- `/api/v1/auth/ldap`
 
 ### ClawHub CLI Examples
 

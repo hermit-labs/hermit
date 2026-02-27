@@ -32,17 +32,6 @@ func (a *API) registerRoutes(e *echo.Echo) {
 }
 
 func (a *API) registerPublicV1Routes(v1 *echo.Group) {
-	v1.Use(a.auth.OptionalMiddleware)
-
-	v1.GET("/search", a.handler.Search)
-	v1.GET("/skills", a.handler.ListSkills)
-	v1.GET("/skills/:slug", a.handler.GetSkill)
-	v1.GET("/skills/:slug/versions", a.handler.ListVersions)
-	v1.GET("/skills/:slug/versions/:version", a.handler.GetVersion)
-	v1.GET("/skills/:slug/file", a.handler.GetSkillFile)
-	v1.GET("/resolve", a.handler.Resolve)
-	v1.GET("/download", a.handler.Download)
-
 	// Auth endpoints (public, no token required)
 	v1.GET("/auth/providers", a.handler.AuthProviders)
 	v1.POST("/auth/login", a.handler.LocalLogin)
@@ -52,6 +41,14 @@ func (a *API) registerPublicV1Routes(v1 *echo.Group) {
 func (a *API) registerAuthV1Routes(v1 *echo.Group) {
 	v1Auth := v1.Group("")
 	v1Auth.Use(a.auth.Middleware)
+	v1Auth.GET("/search", a.handler.Search)
+	v1Auth.GET("/skills", a.handler.ListSkills)
+	v1Auth.GET("/skills/:slug", a.handler.GetSkill)
+	v1Auth.GET("/skills/:slug/versions", a.handler.ListVersions)
+	v1Auth.GET("/skills/:slug/versions/:version", a.handler.GetVersion)
+	v1Auth.GET("/skills/:slug/file", a.handler.GetSkillFile)
+	v1Auth.GET("/resolve", a.handler.Resolve)
+	v1Auth.GET("/download", a.handler.Download)
 	v1Auth.GET("/whoami", a.handler.Whoami)
 	v1Auth.POST("/skills", a.handler.PublishSkill)
 	v1Auth.DELETE("/skills/:slug", a.handler.DeleteSkill)

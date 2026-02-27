@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useRouterState } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
 import {
   Shield,
@@ -27,16 +27,18 @@ const themeOptions = [
 
 export function Navbar({
   loggedIn,
-  onSignIn,
   onSignOut,
 }: {
   loggedIn: boolean
-  onSignIn: () => void
   onSignOut: () => void
 }) {
   const { mode, setMode } = useTheme()
   const ActiveIcon = themeOptions.find((o) => o.value === mode)!.Icon
   const [showChangePw, setShowChangePw] = useState(false)
+  const currentPath = useRouterState({
+    select: (state) =>
+      `${state.location.pathname}${state.location.searchStr}${state.location.hash}`,
+  })
 
   return (
     <>
@@ -97,10 +99,14 @@ export function Navbar({
                 </ul>
               </div>
             ) : (
-              <button onClick={onSignIn} className="btn btn-primary btn-sm">
+              <Link
+                to="/login"
+                search={{ redirect: currentPath }}
+                className="btn btn-primary btn-sm"
+              >
                 <LogIn className="h-4 w-4" />
                 Sign in
-              </button>
+              </Link>
             )}
           </div>
         </div>

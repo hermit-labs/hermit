@@ -11,30 +11,77 @@ export class APIError extends Error {
   }
 }
 
+type UnauthorizedHandler = () => void
+type TokenChangeHandler = (token: string | null) => void
+
+interface RequestOptions extends RequestInit {
+  suppressUnauthorizedHandler?: boolean
+}
+
+const unauthorizedHandlers = new Set<UnauthorizedHandler>()
+const tokenChangeHandlers = new Set<TokenChangeHandler>()
+
+export function onUnauthorized(handler: UnauthorizedHandler): () => void {
+  unauthorizedHandlers.add(handler)
+  return () => unauthorizedHandlers.delete(handler)
+}
+
+export function onTokenChange(handler: TokenChangeHandler): () => void {
+  tokenChangeHandlers.add(handler)
+  return () => tokenChangeHandlers.delete(handler)
+}
+
 function authHeaders(): HeadersInit {
   const token = getToken()
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+function notifyUnauthorized(options?: { suppressUnauthorizedHandler?: boolean }): void {
+  if (options?.suppressUnauthorizedHandler) return
+  clearToken()
+  for (const handler of unauthorizedHandlers) handler()
+}
+
+async function readErrorMessage(res: Response): Promise<string> {
+  let msg = res.statusText
+  try {
+    const body = (await res.json()) as unknown
+    if (
+      body &&
+      typeof body === 'object' &&
+      'message' in body &&
+      typeof body.message === 'string' &&
+      body.message.trim()
+    ) {
+      msg = body.message
+    }
+  } catch {
+    // ignore
+  }
+  return msg
+}
+
+async function throwAPIError(res: Response, options?: { suppressUnauthorizedHandler?: boolean }): Promise<never> {
+  if (res.status === 401) {
+    notifyUnauthorized(options)
+  }
+  const msg = await readErrorMessage(res)
+  throw new APIError(res.status, msg)
+}
+
+async function request<T>(url: string, init?: RequestOptions): Promise<T> {
+  const { suppressUnauthorizedHandler, ...requestInit } = init ?? {}
   const res = await fetch(url, {
-    ...init,
+    ...requestInit,
     headers: {
       ...authHeaders(),
       'Content-Type': 'application/json',
-      ...init?.headers,
+      ...requestInit.headers,
     },
   })
 
   if (!res.ok) {
-    let msg = res.statusText
-    try {
-      const body = await res.json()
-      msg = body.message ?? msg
-    } catch {
-      // ignore
-    }
-    throw new APIError(res.status, msg)
+    return throwAPIError(res, { suppressUnauthorizedHandler })
   }
 
   return res.json() as Promise<T>
@@ -48,10 +95,12 @@ export function getToken(): string | null {
 
 export function setToken(token: string): void {
   localStorage.setItem('hermit_token', token)
+  for (const handler of tokenChangeHandlers) handler(token)
 }
 
 export function clearToken(): void {
   localStorage.removeItem('hermit_token')
+  for (const handler of tokenChangeHandlers) handler(null)
 }
 
 // Types
@@ -256,14 +305,7 @@ export const api = {
     })
 
     if (!res.ok) {
-      let msg = res.statusText
-      try {
-        const body = await res.json()
-        msg = body.message ?? msg
-      } catch {
-        // ignore
-      }
-      throw new APIError(res.status, msg)
+      return throwAPIError(res)
     }
 
     return res.json() as Promise<{
@@ -390,8 +432,10 @@ export const api = {
       {
         headers: authHeaders(),
       },
-    ).then((res) => {
-      if (!res.ok) throw new Error('Failed to load file')
+    ).then(async (res) => {
+      if (!res.ok) {
+        return throwAPIError(res)
+      }
       return res.text()
     }),
 }
@@ -440,18 +484,22 @@ export interface LoginResult {
 
 export const authApi = {
   getProviders: () =>
-    request<{ providers: AuthProvider[] }>(`${API_BASE}/auth/providers`),
+    request<{ providers: AuthProvider[] }>(`${API_BASE}/auth/providers`, {
+      suppressUnauthorizedHandler: true,
+    }),
 
   login: (username: string, password: string) =>
     request<LoginResult>(`${API_BASE}/auth/login`, {
       method: 'POST',
       body: JSON.stringify({ username, password }),
+      suppressUnauthorizedHandler: true,
     }),
 
   ldapLogin: (username: string, password: string) =>
     request<LoginResult>(`${API_BASE}/auth/ldap`, {
       method: 'POST',
       body: JSON.stringify({ username, password }),
+      suppressUnauthorizedHandler: true,
     }),
 
 }

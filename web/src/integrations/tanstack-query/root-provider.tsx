@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { APIError } from '#/api'
 
 let context:
   | {
@@ -12,7 +13,16 @@ export function getContext() {
     return context
   }
 
-  const queryClient = new QueryClient()
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: (failureCount, error) => {
+          if (error instanceof APIError && error.status === 401) return false
+          return failureCount < 3
+        },
+      },
+    },
+  })
 
   context = {
     queryClient,
